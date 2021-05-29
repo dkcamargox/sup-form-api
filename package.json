@@ -1,0 +1,10 @@
+{
+  "name": "sup_form_api",
+  "version": "1.0.0",
+  "description": "Api Restful for forms to evaluate street sellers",
+  "main": "index.js",
+  "repository": "https://github.com/dkcamargox/sup-form-api",
+  "author": "Douglas Camargo",
+  "license": "MIT",
+  "private": false
+}
