@@ -1,5 +1,7 @@
 .vscode
 credentials.json
+configs/*
+!.gitkeep
 # Logs
 logs
 *.log
