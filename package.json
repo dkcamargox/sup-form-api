@@ -6,5 +6,9 @@
   "repository": "https://github.com/dkcamargox/sup-form-api",
   "author": "Douglas Camargo",
   "license": "MIT",
-  "private": false
+  "private": false,
+  "dependencies": {
+    "express": "^4.17.1",
+    "googleapis": "39"
+  }
 }
