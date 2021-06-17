@@ -1,3 +1,4 @@
+*.lock
 .vscode
 credentials.json
 configs/*
