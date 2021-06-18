@@ -7,10 +7,21 @@
   "author": "Douglas Camargo",
   "license": "MIT",
   "private": false,
+  "nodemonConfig": {
+    "ignore": ["node_modules/*", "LICENSE", "README.md"]
+  },
+  "scripts": {
+    "dev": "nodemon ./src/index.js",
+    "run": "node src/index.js"
+  },
   "dependencies": {
+    "cors": "^2.8.5",
     "dotenv": "^10.0.0",
     "express": "^4.17.1",
     "google-spreadsheet": "^3.1.15",
     "googleapis": "^76.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.7"
   }
 }
