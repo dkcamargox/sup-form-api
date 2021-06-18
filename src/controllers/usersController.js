@@ -25,8 +25,8 @@ module.exports = {
         }
     },
     /**
-     * recieves userId => id of the user for logç
-     * recieves password
+     * recieves userId<string> => id of the user for log
+     * recieves password<string> => password to test
      * return true of false for the password match { match: true/false }
      */
     async logIn(request, response) {
@@ -40,20 +40,21 @@ module.exports = {
             const users = rows.map(row => {
                 return {
                     id: row.id,
-                    name: row.usuario
+                    name: row.usuario,
+                    password: row.password
                 }
             });
 
-            const userObject = users.find(user => user.id === request.body.userId);
-
-            if (userObject === request.body.password) {
+            const userObject = users.find(user => user.id === String(request.body.userId));
+            if (userObject.password === request.body.password) {
                 return response.status(200).json({match: true});
             } else {
                 return response.status(200).json({match: false});
             }
 
         } catch (error) {
-            return response.status(400).json({error: "test password failed"});
+            console.log(error);
+            return response.status(502).json({error: "test password failed"});
         }
     }
 };
