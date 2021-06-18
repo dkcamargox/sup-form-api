@@ -1,8 +1,17 @@
+# package lock files
+package-lock.json
 *.lock
+
+#.vscode notes and keys
 .vscode
+
+#google spreadsheet api credentials
 credentials.json
 configs/*
+
+# keep the folder for the record
 !.gitkeep
+
 # Logs
 logs
 *.log
