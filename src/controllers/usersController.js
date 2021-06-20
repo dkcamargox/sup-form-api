@@ -1,4 +1,4 @@
-const createConnection = require('../services/sheetsConnection');
+const { createMaestroConnection, createSucursalConnection } = require('../services/sheetsConnections');
 const { getDate, getTime } = require('../utils/dates');
 module.exports = {
     /**
@@ -6,9 +6,9 @@ module.exports = {
      */
     async getUsers(request, response) {
         try {
-            const doc = await createConnection();
+            const maestroDoc = await createMaestroConnection();
 
-            const sheet = doc.sheetsByTitle['usuarios'];
+            const sheet = maestroDoc.sheetsByTitle['usuarios'];
 
             const rows = await sheet.getRows();
 
@@ -21,20 +21,22 @@ module.exports = {
 
             return response.status(200).json(users);
         } catch (error) {
+            console.log(error)
             return response.status(400).json({error: "get users failed"});
         }
     },
     /**
      * recieves userId<string> => id of the user for log
      * recieves password<string> => password to test
+     * recieves sucursal<string> => sucursal
      * return true of false for the password match { match: true/false }
      * writes in the sheet the information about the login
      */
     async logIn(request, response) {
         try {
-            const doc = await createConnection();
+            const maestroDoc = await createMaestroConnection();
 
-            const usersSheet = doc.sheetsByTitle['usuarios'];
+            const usersSheet = maestroDoc.sheetsByTitle['usuarios'];
 
             const usersSheetRows = await usersSheet.getRows();
 
@@ -42,18 +44,33 @@ module.exports = {
                 return {
                     id: user.id,
                     name: user.usuario,
-                    password: user.password
+                    password: user.password,
+                    sucursal: user.sucursal
                 }
             });
 
             const logInUser = usersList.find(user => user.id === String(request.body.userId));
+            let sucursalDoc
+
+            /**
+             * if user sucursal is 0 then he has access to whatever sucursal he wants
+             * else he has to access the sucursal he is design to
+             */
+             console.log(request.body)
+             console.log(logInUser)
+            if(logInUser.sucursal === '0' || String(request.body.sucursal) === logInUser.sucursal) {
+                sucursalDoc = await createSucursalConnection(request.body.sucursal);
+            } else {
+                return response.status(403).json({error: "No tenés accesso a esa sucursal"});
+            }
+
             if (logInUser.password === request.body.password) {
                 try {
                     /**
                      * add a login log into the sheet
                      * usuario	data 	hora	coordenada y	coordenada x
                      */
-                    const loginSheet = doc.sheetsByTitle['logueos de supervisor']
+                    const loginSheet = sucursalDoc.sheetsByTitle['logueos de supervisor']
 
                     loginSheet.addRow({
                         'usuario': logInUser.name,
@@ -64,7 +81,7 @@ module.exports = {
                     })
                 } catch (error) {
                     console.log(error);
-                    return response.status(502).json({error: "register login failed"})
+                    return response.status(502).json({error: "register login failed"});
                 }
                 return response.status(200).json({match: true});
             } else {
