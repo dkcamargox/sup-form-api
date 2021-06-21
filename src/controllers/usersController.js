@@ -22,7 +22,7 @@ module.exports = {
             return response.status(200).json(users);
         } catch (error) {
             console.log(error)
-            return response.status(400).json({error: "get users failed"});
+            return response.status(502).json({error: "Busqueda de usuarios falló!"});
         }
     },
     /**
@@ -81,16 +81,16 @@ module.exports = {
                     })
                 } catch (error) {
                     console.log(error);
-                    return response.status(502).json({error: "register login failed"});
+                    return response.status(502).json({error: "Registrar el login falló"});
                 }
                 return response.status(200).json({match: true});
             } else {
-                return response.status(200).json({match: false});
+                return response.status(401).json({match: false, error: "Contraseña incorrecta"});
             }
 
         } catch (error) {
             console.log(error);
-            return response.status(502).json({error: "test password failed"});
+            return response.status(502).json({error: "Teste de constraseña falló"});
         }
     }
 };

@@ -17,13 +17,13 @@ module.exports = {
   async createSucursalConnection(sucursal) {
     let doc;
     switch(sucursal) {
-      case 1:
+      case '1':
         doc = new GoogleSpreadsheet(process.env.CTES_SHEET_CODE);
       break;
-      case 2:
+      case '2':
         doc = new GoogleSpreadsheet(process.env.RCIA_SHEET_CODE);
       break;
-      case 3:
+      case '3':
         doc = new GoogleSpreadsheet(process.env.MNES_SHEET_CODE);
       break;
     }
