@@ -2,7 +2,7 @@ const express = require("express");
 const routes = express.Router();
 const { getUsers, logIn } = require("./controllers/usersController");
 const { getSellers, getRoutes } = require("./controllers/sellersController");
-const { postSurvey } = require("./controllers/infosController");
+const { postSurvey } = require("./controllers/surveyController");
 
 routes.get("/users", getUsers);
 routes.get("/sellers/:sucursal/:supervisor", getSellers);
