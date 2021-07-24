@@ -69,7 +69,7 @@ module.exports = {
       console.log(error);
       return response
         .status(502)
-        .json({ error: "Cadastro de Relevamiento falló" });
+        .json({ error: "Cadastro de Pre Coaching falló" });
     }
   },
   async postPostCoaching(request, response) {
@@ -104,7 +104,88 @@ module.exports = {
       console.log(error);
       return response
         .status(502)
-        .json({ error: "Cadastro de Relevamiento falló" });
+        .json({ error: "Cadastro de Post Coaching falló" });
+    }
+  },
+  async postCoaching(request, response) {
+    try {
+      console.log(request.body);
+      const sucursalDoc = await createSucursalConnection(request.body.sucursal);
+      const surveySheet = sucursalDoc.sheetsByTitle["coaching"];
+
+      const { supervisor, seller, route, cordy, cordx } = request.body;
+
+      const supervisorName = await getSupervisorNameById(supervisor);
+      const sellerName = await getSellerNameById(request.body.sucursal, seller);
+      const routeName = await getRouteNameById(request.body.sucursal, route);
+
+      console.log(request.body);
+      const {
+        clientId,
+        clientName,
+        loadingSend,
+        lastOrder,
+        sellPlan,
+        pop,
+        stock,
+        exposition,
+        competitorSales,
+        sales,
+        sellPropouse,
+        deliveryPrecautions,
+        popPricing,
+        timeManagement,
+        catalogue,
+        relationship
+      } = request.body;
+
+      surveySheet.addRow({
+        Supervisor: supervisorName,
+        Preventista: sellerName,
+        Ruta: routeName,
+        Data: getDate(),
+        Hora: getTime(),
+        Latitud: cordy,
+        Longitud: cordx,
+        "Codigo de cliente": clientId,
+        "Nombre del cliente": clientName,
+        "¿Indaga sobre el último pedido?": prettyfyTrueFalse(lastOrder),
+        "¿Planifica el pedido antes de ingresar al PDV?": prettyfyTrueFalse(
+          sellPlan
+        ),
+        "¿POP?": prettyfyTrueFalse(pop),
+        "¿Verifica el stock en todas las áreas del PDV?": prettyfyTrueFalse(
+          stock
+        ),
+        "¿Trabaja en una mayor exposición de los productos?": prettyfyTrueFalse(
+          exposition
+        ),
+        "¿Indaga y verifica la situación y las acciones de la competencia?": prettyfyTrueFalse(
+          competitorSales
+        ),
+        "¿Comunica las acciones comerciales vigentes?": prettyfyTrueFalse(
+          sales
+        ),
+        "¿Realiza la propuesta de ventas, ofreciendo todos los productos?": prettyfyTrueFalse(
+          sellPropouse
+        ),
+        "¿Toma todos los recaudos necesarios para facilitar la entrega? (pedido, dinero, horario, etc.)": prettyfyTrueFalse(
+          deliveryPrecautions
+        ),
+        "¿Renueva, coloca y pone precios al POP? Siguiendo criterios del PDV": prettyfyTrueFalse(
+          popPricing
+        ),
+        "¿Administra el tiempo de permanencia en el PDV?": prettyfyTrueFalse(
+          timeManagement
+        ),
+        "¿Uso de Catálogo?": prettyfyTrueFalse(catalogue),
+        "¿Relación con el cliente?": relationship
+      });
+
+      return response.status(200).json();
+    } catch (error) {
+      console.log(error);
+      return response.status(502).json({ error: "Cadastro de Coaching falló" });
     }
   }
 };

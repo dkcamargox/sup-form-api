@@ -5,7 +5,8 @@ const { getSellers, getRoutes } = require("./controllers/sellersController");
 const { postSurvey } = require("./controllers/surveyController");
 const {
   postPreCoaching,
-  postPostCoaching
+  postPostCoaching,
+  postCoaching
 } = require("./controllers/coachingController");
 
 routes.get("/users", getUsers);
@@ -14,6 +15,7 @@ routes.get("/routes/:sucursal/:seller_id", getRoutes);
 routes.post("/survey", postSurvey);
 routes.post("/pre-coaching", postPreCoaching);
 routes.post("/post-coaching", postPostCoaching);
+routes.post("/coaching", postCoaching);
 routes.post("/login", logIn);
 
 module.exports = routes;
