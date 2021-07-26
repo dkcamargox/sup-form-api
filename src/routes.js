@@ -3,6 +3,7 @@ const routes = express.Router();
 const { getUsers, logIn } = require("./controllers/usersController");
 const { getSellers, getRoutes } = require("./controllers/sellersController");
 const { postSurvey } = require("./controllers/surveyController");
+const { getProductsById } = require("./controllers/productsController");
 const {
   postPreCoaching,
   postPostCoaching,
@@ -17,5 +18,6 @@ routes.post("/pre-coaching", postPreCoaching);
 routes.post("/post-coaching", postPostCoaching);
 routes.post("/coaching", postCoaching);
 routes.post("/login", logIn);
+routes.get("/products/:sucursal", getProductsById);
 
 module.exports = routes;
