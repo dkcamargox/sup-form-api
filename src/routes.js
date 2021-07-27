@@ -3,7 +3,10 @@ const routes = express.Router();
 const { getUsers, logIn } = require("./controllers/usersController");
 const { getSellers, getRoutes } = require("./controllers/sellersController");
 const { postSurvey } = require("./controllers/surveyController");
-const { getProductsById } = require("./controllers/productsController");
+const {
+  getProductsById,
+  updateProducts
+} = require("./controllers/productsController");
 const {
   postPreCoaching,
   postPostCoaching,
@@ -19,5 +22,6 @@ routes.post("/post-coaching", postPostCoaching);
 routes.post("/coaching", postCoaching);
 routes.post("/login", logIn);
 routes.get("/products/:sucursal", getProductsById);
+routes.put("/update-sheets", updateProducts);
 
 module.exports = routes;

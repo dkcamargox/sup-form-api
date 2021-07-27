@@ -1,9 +1,17 @@
 module.exports = {
   prettyfyTrueFalse(string) {
-    return string === true || string === "true" ? "Sí" : "No";
+    if (string === undefined || string === "undefined") {
+      return "";
+    } else {
+      return string === true || string === "true" ? "Sí" : "No";
+    }
   },
   invertedprettyfyTrueFalse(string) {
-    return string === true || string === "true" ? "No" : "Sí";
+    if (string === undefined || string === "undefined") {
+      return "";
+    } else {
+      return string === true || string === "true" ? "No" : "Sí";
+    }
   },
   prettyfyFrequency(frequency) {
     return {
