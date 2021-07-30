@@ -8,15 +8,11 @@
   "license": "MIT",
   "private": false,
   "nodemonConfig": {
-    "ignore": [
-      "node_modules/*",
-      "LICENSE",
-      "README.md"
-    ]
+    "ignore": ["node_modules/*", "LICENSE", "README.md"]
   },
   "scripts": {
     "dev": "nodemon ./src/index.js",
-    "run": "node src/index.js"
+    "start": "node src/index.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
