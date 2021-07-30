@@ -84,7 +84,12 @@ module.exports = {
       const sellerName = await getSellerNameById(request.body.sucursal, seller);
       const routeName = await getRouteNameById(request.body.sucursal, route);
 
-      const { commentsText, strongPoints, weakPoints } = request.body;
+      const {
+        commentsText,
+        strongPoints,
+        weakPoints,
+        finalStats
+      } = request.body;
 
       surveySheet.addRow({
         Supervisor: supervisorName,
@@ -95,6 +100,7 @@ module.exports = {
         Latitud: cordy,
         Longitud: cordx,
         Comentarios: commentsText,
+        "Puntaje Final": finalStats,
         "Puntos Fuertes": strongPoints,
         "Puntos a desarollar": weakPoints
       });
