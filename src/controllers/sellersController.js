@@ -30,7 +30,8 @@ module.exports = {
         return {
           id: supervisorsRow.id,
           name: supervisorsRow.usuario,
-          sucursal: supervisorsRow.sucursal
+          sucursal: supervisorsRow.sucursal,
+          roll: supervisorsRow.roll
         };
       });
       const supervisor = supervisors.find((user) => {
@@ -38,16 +39,19 @@ module.exports = {
       });
 
       let filteredSellers;
-      if (supervisor.sucursal !== "0") {
+      if (
+        supervisor.sucursal === "0" ||
+        supervisor.roll !== "supervisor"
+      ) {
+        filteredSellers = sellers.filter((seller) => {
+          return `${request.params.sucursal}` === seller.sucursal;
+        });
+      } else {
         filteredSellers = sellers.filter((seller) => {
           return (
             `${request.params.supervisor}` === seller.sup_id &&
             `${request.params.sucursal}` === seller.sucursal
           );
-        });
-      } else {
-        filteredSellers = sellers.filter((seller) => {
-          return `${request.params.sucursal}` === seller.sucursal;
         });
       }
 
