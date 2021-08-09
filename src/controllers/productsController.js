@@ -104,7 +104,6 @@ module.exports = {
           if (productData.table === "redcom") {
             return mutableHeaders.push(
               `hay ${productData.label}?`,
-              `está ${productData.label} en gondola?`,
               `tiene afiche de ${productData.label}?`,
               `está ${productData.label} precificado correctamente?`,
               `está ${productData.label} exhibido correctamente?`
@@ -112,7 +111,6 @@ module.exports = {
           } else {
             return mutableHeaders.push(
               `hay ${productData.label}?`,
-              `está ${productData.label} en gondola?`,
               `tiene afiche de ${productData.label}?`,
               `está ${productData.label} precificado correctamente?`
             );
