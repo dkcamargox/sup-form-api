@@ -1,10 +1,15 @@
+
 require("dotenv").config();
 const { GoogleSpreadsheet } = require("google-spreadsheet");
 
 module.exports = {
   async createMaestroConnection() {
     try {
-      const doc = new GoogleSpreadsheet(process.env.MAESTRO_SHEET_CODE);
+      const doc = new GoogleSpreadsheet(
+        process.env.NODE_ENV === 'production'
+        ? process.env.MAESTRO_SHEET_CODE
+        : process.env.DEV_MAESTRO_SHEET_CODE
+      );
 
       await doc.useServiceAccountAuth({
         client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
@@ -24,13 +29,25 @@ module.exports = {
     let doc;
     switch (sucursal) {
       case "1":
-        doc = new GoogleSpreadsheet(process.env.CTES_SHEET_CODE);
+        doc = new GoogleSpreadsheet(
+          process.env.NODE_ENV === 'production'
+          ? process.env.CTES_SHEET_CODE
+          : process.env.DEV_CTES_SHEET_CODE
+        );
         break;
       case "2":
-        doc = new GoogleSpreadsheet(process.env.RCIA_SHEET_CODE);
+        doc = new GoogleSpreadsheet(
+          process.env.NODE_ENV === 'production'
+          ? process.env.RCIA_SHEET_CODE
+          : process.env.DEV_RCIA_SHEET_CODE
+        );
         break;
       case "3":
-        doc = new GoogleSpreadsheet(process.env.MNES_SHEET_CODE);
+        doc = new GoogleSpreadsheet(
+          process.env.NODE_ENV === 'production'
+          ? process.env.MNES_SHEET_CODE
+          : process.env.DEV_MNES_SHEET_CODE
+        );
         break;
       default:
         break;
