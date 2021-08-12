@@ -88,7 +88,19 @@ module.exports = {
         commentsText,
         strongPoints,
         weakPoints,
-        finalStats
+        total,
+        lastOrder,
+        sellPlan,
+        pop,
+        stock,
+        exposition,
+        competitorSales,
+        sales,
+        sellPropouse,
+        deliveryPrecautions,
+        popPricing,
+        timeManagement,
+        catalogue
       } = request.body;
 
       surveySheet.addRow({
@@ -100,9 +112,21 @@ module.exports = {
         Latitud: cordy,
         Longitud: cordx,
         Comentarios: commentsText,
-        "Puntaje Final": finalStats,
+        "Puntaje Final": total,
         "Puntos Fuertes": strongPoints,
-        "Puntos a desarollar": weakPoints
+        "Puntos a desarollar": weakPoints,
+        "¿Indaga sobre el último pedido?": lastOrder,
+        "¿Planifica el pedido antes de ingresar al PDV?": sellPlan,
+        "¿POP?": pop,
+        "¿Verifica el stock en todas las áreas del PDV?": stock,
+        "¿Trabaja en una mayor exposición de los productos?": exposition,
+        "¿Indaga y verifica la situación y las acciones de la competencia?": competitorSales,
+        "¿Comunica las acciones comerciales vigentes?": sales,
+        "¿Realiza la propuesta de ventas, ofreciendo todos los productos?": sellPropouse,
+        "¿Toma todos los recaudos necesarios para facilitar la entrega? (pedido, dinero, horario, etc.)": deliveryPrecautions,
+        "¿Renueva, coloca y pone precios al POP? Siguiendo criterios del PDV": popPricing,
+        "¿Administra el tiempo de permanencia en el PDV?": timeManagement,
+        "¿Uso de Catálogo?": catalogue,
       });
 
       return response.status(200).json();
