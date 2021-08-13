@@ -12,6 +12,7 @@ module.exports = {
       return {
         "Competencia de Aguas": "water",
         "Competencia de Gaseosas": "soda",
+        "Competencia de Vinos": "wine",
         "Productos Redcom": "redcom"
       }[tableString];
     };
@@ -63,9 +64,18 @@ module.exports = {
               "label": "${sodaLine.label}",
               "name": "${sodaLine.linea}"
             }`);
-          })
+          }),
+        wine: sucursalLines
+          .filter((line) => line.table === "wine")
+          .map((sodaLine) => {
+            return JSON.parse(`{
+              "label": "${sodaLine.label}",
+              "name": "${sodaLine.linea}"
+            }`);
+          }),
+        
       };
-
+      console.log(treatedSucursalLines)
       return response.status(200).json(treatedSucursalLines);
     } catch (error) {
       console.log(error);
@@ -93,6 +103,9 @@ module.exports = {
         await surveySheet.loadHeaderRow();
         const imutableHeaders = surveySheet.headerValues.slice(0, 14);
 
+        /**
+         * IN CASE YOU ARE WONDERING THIS IS WHERE WE SELECT THE PRODUCTS BY SUCURSAL
+         */
         const productsData = await getAllProductsDataBySucursalId(sucursalId);
 
         let mutableHeaders = [];
