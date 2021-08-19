@@ -50,7 +50,8 @@ module.exports = {
           id: user.id,
           name: user.usuario,
           password: user.password,
-          sucursal: user.sucursal
+          sucursal: user.sucursal,
+          roll: user.roll
         };
       });
 
@@ -63,7 +64,6 @@ module.exports = {
        * if user sucursal is 0 then he has access to whatever sucursal he wants
        * else he has to access the sucursal he is design to
        */
-      console.log(request.body);
       console.log(logInUser);
       if (
         logInUser.sucursal === "0" ||
@@ -98,7 +98,7 @@ module.exports = {
             .status(502)
             .json({ error: "Registrar el login falló" });
         }
-        return response.status(200).json({ match: true });
+        return response.status(200).json({ match: true, user: logInUser});
       } else {
         return response
           .status(401)
