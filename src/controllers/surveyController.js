@@ -25,9 +25,6 @@ module.exports = {
           "hay ${data.label}?": "${invertedprettyfyTrueFalse(
           clientSideData[`${CSStoObjectNotation(data.name)}Noproduct`]
         )}",
-            "está ${data.label} en gondola?": "${prettyfyTrueFalse(
-          clientSideData[`${CSStoObjectNotation(data.name)}Gondola`]
-        )}",
             "tiene afiche de ${data.label}?": "${prettyfyTrueFalse(
           clientSideData[`${CSStoObjectNotation(data.name)}Poster`]
         )}",

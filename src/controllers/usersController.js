@@ -21,7 +21,7 @@ module.exports = {
           name: row.usuario
         };
       });
-
+      console.log(users)
       return response.status(200).json(users);
     } catch (error) {
       console.log(error);
