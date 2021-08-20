@@ -19,6 +19,7 @@ module.exports = {
    * recieves survey data loads to spreadsheet
    */
   async postSurvey(request, response) {
+    console.log(request.body)
     const getSurveyQnAObject = (serverSideData, clientSideData) => {
       return serverSideData.map((data) => {
         return JSON.parse(`{
@@ -66,15 +67,17 @@ module.exports = {
         surveyRedcom,
         surveySoda,
         surveyWater,
+        surveyWines,
         exhibition
       } = request.body;
 
       const surveyData = await getProductsBySucursalId(request.body.sucursal);
-
+      console.log()
       const threatedSurveyData = [].concat(
         getSurveyQnAObject(surveyData.redcom, surveyRedcom),
         getSurveyQnAObject(surveyData.water, surveyWater),
         getSurveyQnAObject(surveyData.soda, surveySoda),
+        getSurveyQnAObject(surveyData.wine, surveyWines),
         getExhibitionQnAObject(surveyData.redcom, exhibition)
       );
 

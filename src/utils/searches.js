@@ -75,6 +75,7 @@ module.exports = {
       return {
         "Competencia de Aguas": "water",
         "Competencia de Gaseosas": "soda",
+        "Competencia de Vinos": "wine",
         "Productos Redcom": "redcom"
       }[tableString];
     };
@@ -123,7 +124,15 @@ module.exports = {
               "label": "${sodaLine.label}",
               "name": "${sodaLine.linea}"
             }`);
-          })
+          }),
+        wine: sucursalLines
+          .filter((line) => line.table === "wine")
+          .map((sodaLine) => {
+            return JSON.parse(`{
+              "label": "${sodaLine.label}",
+              "name": "${sodaLine.linea}"
+            }`);
+          }),
       };
       return treatedSucursalLines;
     } catch (error) {
@@ -136,6 +145,7 @@ module.exports = {
       return {
         "Competencia de Aguas": "water",
         "Competencia de Gaseosas": "soda",
+        "Competencia de Vinos": "wine",
         "Productos Redcom": "redcom"
       }[tableString];
     };
