@@ -41,7 +41,7 @@ module.exports = {
         return JSON.parse(`{
           "está ${
             data.label
-          } exhibido correctamente?": "${invertedprettyfyTrueFalse(
+          } exhibido correctamente?": "${prettyfyTrueFalse(
           clientSideData[CSStoObjectNotation(`exhibition-${data.name}`)]
         )}"}`);
       });
