@@ -12,6 +12,12 @@ const {
   postPostCoaching,
   postCoaching
 } = require("./controllers/coachingController");
+const {
+  getSurveyDataBySupervisor,
+  getSurveyDataBySeller,
+  getSurveyDataByLogistic,
+  getProductsSurveyData
+} = require("./controllers/statisticsController");
 
 routes.get("/users", getUsers);
 routes.get("/sellers/:sucursal/:supervisor", getSellers);
@@ -23,5 +29,9 @@ routes.post("/coaching", postCoaching);
 routes.post("/login", logIn);
 routes.get("/products/:sucursal", getProductsById);
 routes.put("/update-sheets", updateProducts);
+routes.get("/survey-data/supervisors/:sucursal", getSurveyDataBySupervisor);
+routes.get("/survey-data/sellers/:sucursal", getSurveyDataBySeller);
+routes.get("/survey-data/logistic/:sucursal", getSurveyDataByLogistic);
+routes.get("/survey-data/products/:sucursal", getProductsSurveyData);
 
 module.exports = routes;
