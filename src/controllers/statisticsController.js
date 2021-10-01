@@ -4,7 +4,11 @@ const {
 } = require("../services/sheetsConnections");
 
 const { getDate, getTime } = require("../utils/dates");
-const { getProductsBySucursalId } = require("../utils/searches");
+const { 
+    getProductsBySucursalId,
+    getSellerNameById,
+    getRouteNameById
+} = require("../utils/searches");
 const surveyController = require("./surveyController");
 
 module.exports = {
@@ -97,8 +101,74 @@ module.exports = {
             const sucursalDoc = await createSucursalConnection(request.params.sucursal);
             const surveySheet = sucursalDoc.sheetsByTitle["relevameinto"];
 
-            const surveyRows = await surveySheet.getRows();
+            let surveyRows = await surveySheet.getRows();
 
+
+            // apply filters here and store in surveyRows
+            
+            console.log(request.query)
+            // parse to sheet format
+            const parseDate = (date) => {
+                var thisDate = date.split('/');
+                return [thisDate[2],thisDate[1],thisDate[0] ].join("-");
+            };
+
+            if (`${request.query.filter}` === 'true') {
+                const {
+                    selectedSeller,
+                    selectedRoute
+                } = request.query;
+
+                const finalDate = new Date(request.query.finalDate)
+                const initialDate = new Date(request.query.initialDate)
+                
+                let seller;
+                let route; 
+                if (selectedSeller !== '') {
+                    seller = await getSellerNameById(request.params.sucursal, selectedSeller)
+                }
+                if (selectedRoute !== '') {
+                    route = await getRouteNameById(request.params.sucursal, selectedRoute)
+                }
+                console.log(seller)
+                console.log(initialDate)
+                console.log(finalDate)
+                surveyRows = surveyRows.filter(row => {
+                    const date = new Date(parseDate(row['Data']))
+
+
+
+                    if (selectedSeller === '') {
+                        return (
+                            date > initialDate &&
+                            date <= finalDate
+                        )
+                    }
+                    else if (selectedRoute === '') {
+                        return (
+                            date > initialDate &&
+                            date <= finalDate &&
+                            row['Preventista'] === seller
+                        )
+                    }
+                    else {
+                        return (
+                            date > initialDate &&
+                            date <= finalDate &&
+                            row['Preventista'] === seller &&
+                            row['Ruta'] === route
+                        )
+                    }
+                });
+                
+            }
+            console.log(surveyRows.map(row => ({ seller: row['Preventista'], date: row['Data'], route: row['Ruta']})))
+            
+            
+            const numberOfSurveys = surveyRows.map(row => {
+                return row['Supervisor']
+            }).length;
+            
             const productsByType = await getProductsBySucursalId(request.params.sucursal);
             const productsPercetageByType = {}
 
@@ -144,8 +214,13 @@ module.exports = {
                 return productsPercetageByType[productsType] = productsTreatedData;
             })
 
-            
-
+            productsPercetageByType['surveyCount']  = numberOfSurveys;
+            if (surveyRows.length === 0) {
+                productsPercetageByType['code']  = 1;
+            } else {
+                productsPercetageByType['code']  = 0;
+            }
+            console.log(productsPercetageByType)
             return response
                 .status(200)
                 .json(productsPercetageByType);
