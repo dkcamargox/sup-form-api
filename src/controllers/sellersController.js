@@ -39,21 +39,10 @@ module.exports = {
       });
 
       let filteredSellers;
-      if (
-        supervisor.sucursal === "0" ||
-        supervisor.roll !== "supervisor"
-      ) {
-        filteredSellers = sellers.filter((seller) => {
-          return `${request.params.sucursal}` === seller.sucursal;
-        });
-      } else {
-        filteredSellers = sellers.filter((seller) => {
-          return (
-            `${request.params.supervisor}` === seller.sup_id &&
-            `${request.params.sucursal}` === seller.sucursal
-          );
-        });
-      }
+      
+      filteredSellers = sellers.filter((seller) => {
+        return `${request.params.sucursal}` === seller.sucursal;
+      });
 
       return response.status(200).json(filteredSellers);
     } catch (error) {

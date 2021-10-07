@@ -4,87 +4,108 @@ const {
 } = require("../services/sheetsConnections");
 
 const { getDate, getTime } = require("../utils/dates");
-const { getProductsBySucursalId } = require("../utils/searches");
+const { 
+    getProductsBySucursalId,
+    getSellerNameById,
+    getRouteNameById
+} = require("../utils/searches");
 const surveyController = require("./surveyController");
 
 module.exports = {
-    async getSurveyDataBySupervisor(request, response) {
+    async getSurveyData(request, response) {
         try {
             const sucursalDoc = await createSucursalConnection(request.params.sucursal);
-            const surveySheet = sucursalDoc.sheetsByTitle["relevameinto"];
+            const surveySheet = await sucursalDoc.sheetsByTitle["relevameinto"];
 
             const surveyRows = await surveySheet.getRows();
 
-            const surveyData = surveyRows.map(row => {
+            let responseData = {};
+
+            // Surveys by supervisors
+
+            // getting supervisors rows
+            const supervisorSurveyData = surveyRows.map(row => {
                 return row['Supervisor']
             });
 
-            const surveyCounts = {};
-            surveyData.forEach(function (x) { surveyCounts[x] = (surveyCounts[x] || 0) + 1; });
+            // parsing from obj to array
+            const supervisorSurveyCounts = {};
+            supervisorSurveyData.forEach(function (x) { supervisorSurveyCounts[x] = (supervisorSurveyCounts[x] || 0) + 1; });
             
             // threating data to fit react-google-charts
-            const surveyCountsArray = Object.entries(surveyCounts).map(surveyCount => surveyCount)
-            surveyCountsArray.push(['Supervisor', 'Cuantidad de Relevamientos'])
-            surveyCountsArray.reverse()
-            console.log(surveyCountsArray)
-            return response
-                .status(200).json(surveyCountsArray);
-        } catch (error) {
-            console.log(error);
-            return response
-                .status(502)
-                .json({ error: "Busqueda de datos de relevamiento falló!" });
-        }
-    },
-    async getSurveyDataBySeller(request, response) {
-        try {
-            const sucursalDoc = await createSucursalConnection(request.params.sucursal);
-            const surveySheet = sucursalDoc.sheetsByTitle["relevameinto"];
+            const supervisorSurveyCountsArray = Object.entries(supervisorSurveyCounts).map(supervisorSurveyCounts => supervisorSurveyCounts);
+            
+            // adding headers
+            supervisorSurveyCountsArray.push(['Supervisor', 'Cuantidad de Relevamientos']);
+            
+            // reversing for the headers be on position 0
+            supervisorSurveyCountsArray.reverse();
+            
+            // clog for debug
+            console.log(supervisorSurveyCountsArray);
+            
+            // adding to the response
+            responseData['supervisor'] = supervisorSurveyCountsArray;
 
-            const surveyRows = await surveySheet.getRows();
 
-            const surveyData = surveyRows.map(row => {
+            // Surveys by sellers
+
+            // getting sellers rows
+            const sellerSurveyData = surveyRows.map(row => {
                 return row['Preventista']
             });
-
-            const surveyCounts = {};
-            surveyData.forEach(function (x) { surveyCounts[x] = (surveyCounts[x] || 0) + 1; });
+            
+            // parsing from obj to array
+            const sellerSurveyCounts = {};
+            sellerSurveyData.forEach(function (x) { sellerSurveyCounts[x] = (sellerSurveyCounts[x] || 0) + 1; });
             
             // threating data to fit react-google-charts
-            const surveyCountsArray = Object.entries(surveyCounts).map(surveyCount => surveyCount)
-            surveyCountsArray.push(['Preventista', 'Cuantidad de Relevamientos'])
-            surveyCountsArray.reverse()
-            console.log(surveyCountsArray)
-            return response
-                .status(200).json(surveyCountsArray);
-        } catch (error) {
-            console.log(error);
-            return response
-                .status(502)
-                .json({ error: "Busqueda de datos de relevamiento falló!" });
-        }
-    },
-    async getSurveyDataByLogistic(request, response) {
-        try {
-            const sucursalDoc = await createSucursalConnection(request.params.sucursal);
-            const surveySheet = sucursalDoc.sheetsByTitle["relevameinto"];
+            const sellerSurveyCountsArray = Object.entries(sellerSurveyCounts).map(surveyCount => surveyCount);
+            
+            // adding headers
+            sellerSurveyCountsArray.push(['Preventista', 'Cuantidad de Relevamientos']);
 
-            const surveyRows = await surveySheet.getRows();
+            // reversing for the headers be on position 0
+            sellerSurveyCountsArray.reverse();
+            
+            // clog for debug
+            console.log(sellerSurveyCountsArray);
+            
+            // adding to the response
+            responseData['seller'] = sellerSurveyCountsArray;
 
-            const surveyData = surveyRows.map(row => {
+
+            // Surveys by sellers
+
+            // getting sellers rows
+            const logisticSurveyData = surveyRows.map(row => {
                 return row['Problemas de logistica?']
             });
-
-            const surveyCounts = {};
-            surveyData.forEach(function (x) { surveyCounts[x] = (surveyCounts[x] || 0) + 1; });
+            
+            // parsing from obj to array
+            const logisticSurveyCounts = {};
+            logisticSurveyData.forEach(function (x) { logisticSurveyCounts[x] = (logisticSurveyCounts[x] || 0) + 1; });
             
             // threating data to fit react-google-charts
-            const surveyCountsArray = Object.entries(surveyCounts).map(surveyCount => surveyCount)
-            surveyCountsArray.push(['Valor', 'Cantidad'])
-            surveyCountsArray.reverse()
-            console.log(surveyCountsArray)
+            const logisticSurveyCountsArray = Object.entries(logisticSurveyCounts).map(surveyCount => surveyCount);
+            
+            // adding headers
+            logisticSurveyCountsArray.push(['Valor', 'Cantidad']);
+
+            // reversing for the headers be on position 0
+            logisticSurveyCountsArray.reverse();
+            
+            // clog for debug
+            console.log(logisticSurveyCountsArray);
+            
+            // adding to the response
+            responseData['logistic'] = logisticSurveyCountsArray;
+
             return response
-                .status(200).json(surveyCountsArray);
+                .status(200)
+                .json(responseData)
+            
+            
         } catch (error) {
             console.log(error);
             return response
@@ -92,18 +113,80 @@ module.exports = {
                 .json({ error: "Busqueda de datos de relevamiento falló!" });
         }
     },
+
     async getProductsSurveyData(request, response) {
         try {
             const sucursalDoc = await createSucursalConnection(request.params.sucursal);
+            
             const surveySheet = sucursalDoc.sheetsByTitle["relevameinto"];
+            
+            let surveyRows = await surveySheet.getRows();
 
-            const surveyRows = await surveySheet.getRows();
 
-            const productsByType = await getProductsBySucursalId(request.params.sucursal);
+            // apply filters here and store in surveyRows
+            console.log(request.query)
+
+            // parse to sheet format
+            const parseDate = (date) => {
+                var thisDate = date.split('/');
+                return [thisDate[2],thisDate[1],thisDate[0] ].join("-");
+            };
+
+            if (`${request.query.filter}` === 'true') {
+                const {
+                    selectedSeller,
+                    selectedRoute
+                } = request.query;
+
+                const finalDate = new Date(request.query.finalDate)
+                const initialDate = new Date(request.query.initialDate)
+                
+                let seller;
+                let route;
+
+                if (selectedSeller !== '') {
+                    seller = await getSellerNameById(request.params.sucursal, selectedSeller)
+                }
+                
+                if (selectedRoute !== '') {
+                    route = await getRouteNameById(request.params.sucursal, selectedRoute)
+                }                
+                
+                surveyRows = surveyRows.filter(row => {
+                    const date = new Date(parseDate(row['Data']))
+
+                    if (selectedSeller === '') {
+                        return (
+                            date >= initialDate &&
+                            date <= finalDate
+                        )
+                    } else if (selectedRoute === '') {
+                        return (
+                            date >= initialDate &&
+                            date <= finalDate &&
+                            row['Preventista'] === seller
+                        )
+                    } else {
+                        return (
+                            date >= initialDate &&
+                            date <= finalDate &&
+                            row['Preventista'] === seller &&
+                            row['Ruta'] === route
+                        )
+                    }
+                });
+                
+            }
+            
+            const numberOfSurveys = surveyRows.map(row => {
+                return row['Supervisor']
+            }).length;
+
+            const productsByType = await getProductsBySucursalId(request.params.sucursal);            
+            
             const productsPercetageByType = {}
 
             Object.entries(productsByType).forEach(([productsType, products]) => {
-    
                 // getting each product label and parsing to the title sheet format
                 let treatedProductData = products.map(product => {
                     return [
@@ -144,8 +227,14 @@ module.exports = {
                 return productsPercetageByType[productsType] = productsTreatedData;
             })
 
-            
+            productsPercetageByType['surveyCount']  = numberOfSurveys;
+            if (surveyRows.length === 0) {
+                productsPercetageByType['code']  = 1;
+            } else {
+                productsPercetageByType['code']  = 0;
+            }
 
+            console.log(productsPercetageByType)
             return response
                 .status(200)
                 .json(productsPercetageByType);

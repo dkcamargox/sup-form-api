@@ -127,10 +127,10 @@ module.exports = {
           }),
         wine: sucursalLines
           .filter((line) => line.table === "wine")
-          .map((sodaLine) => {
+          .map((wineLine) => {
             return JSON.parse(`{
-              "label": "${sodaLine.label}",
-              "name": "${sodaLine.linea}"
+              "label": "${wineLine.label}",
+              "name": "${wineLine.linea}"
             }`);
           }),
       };
