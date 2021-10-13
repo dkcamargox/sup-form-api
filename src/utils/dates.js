@@ -17,5 +17,10 @@ module.exports = {
         const currentTime = moment().tz('America/Argentina/Cordoba').format('hh:mm');
 
         return currentTime;
+    },
+    // parse to sheet format
+    parseDate(date) {
+        var thisDate = date.split('/');
+        return [thisDate[2],thisDate[1],thisDate[0] ].join("-");
     }
 }

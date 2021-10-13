@@ -3,7 +3,10 @@ const {
     createSucursalConnection
 } = require("../services/sheetsConnections");
 
-const { getDate, getTime } = require("../utils/dates");
+const { 
+    getDate,
+    getTime,
+    parseDate } = require("../utils/dates");
 const { 
     getProductsBySucursalId,
     getSellerNameById,
@@ -126,12 +129,6 @@ module.exports = {
             // apply filters here and store in surveyRows
             console.log(request.query)
 
-            // parse to sheet format
-            const parseDate = (date) => {
-                var thisDate = date.split('/');
-                return [thisDate[2],thisDate[1],thisDate[0] ].join("-");
-            };
-
             if (`${request.query.filter}` === 'true') {
                 const {
                     selectedSeller,
@@ -244,6 +241,62 @@ module.exports = {
             return response
                 .status(502)
                 .json({ error: "Busqueda de datos de relevamiento falló!" });
+        }
+    },
+    async getCoachingData(request, response) {
+        
+
+        try {
+            const sucursalDoc = await createSucursalConnection(request.params.sucursal);
+            const coachingSheet = await sucursalDoc.sheetsByTitle["post-coaching"];
+
+            const coachingsRows = await coachingSheet.getRows();
+
+            const coachings = coachingsRows.map(row => {
+                return {
+                    'supervisor': row['Supervisor'],
+                    'seller': row['Preventista'],
+                    'date': new Date(parseDate(row['Data'])),
+                    'coaching': row['Puntaje Final'],
+                    'pop': row['¿POP?'],
+                    'exibition': row['¿Trabaja en una mayor exposición de los productos?'],
+                }
+            });
+            
+            let dataBySeller = Object()
+
+            coachings.forEach(coaching => {
+                if (dataBySeller.hasOwnProperty(coaching.seller)) {
+                    dataBySeller[coaching.seller].push(coaching)
+                } else {
+                    dataBySeller[coaching.seller] = [coaching]
+                }
+            });
+
+            // Object.entries(productsByType).forEach(([productsType, products])
+            Object.entries(dataBySeller).forEach(([seller, coachings]) => {
+                dataBySeller[seller] = coachings.reduce((a, b) => {
+                    return new Date(a.MeasureDate) > new Date(b.MeasureDate) ? a : b;
+                });
+            })
+
+            const coachingDataBySeller = []
+            Object.entries(dataBySeller).forEach(([seller, coaching]) => {
+                coachingDataBySeller.push({
+                    seller: seller,
+                    coaching: coaching
+                })
+            })
+            return response
+                .status(200)
+                .json(coachingDataBySeller)
+            
+            
+        } catch (error) {
+            console.log(error);
+            return response
+                .status(502)
+                .json({ error: "Busqueda de datos de coachings falló!" });
         }
     }
 }
