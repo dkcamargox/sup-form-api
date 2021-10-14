@@ -287,6 +287,7 @@ module.exports = {
                     coaching: coaching
                 })
             })
+            console.log(coachingDataBySeller)
             return response
                 .status(200)
                 .json(coachingDataBySeller)
