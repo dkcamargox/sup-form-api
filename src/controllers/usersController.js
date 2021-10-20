@@ -31,6 +31,36 @@ module.exports = {
     }
   },
   /**
+   * return a list of users object => { id, name } by suc
+   */
+  async getUsersBySucursal(request, response) {
+    try {
+      const maestroDoc = await createMaestroConnection();
+
+      const sheet = maestroDoc.sheetsByTitle["usuarios"];
+
+      const rows = await sheet.getRows();
+
+      const users = rows.map((row) => {
+        return {
+          id: row.id,
+          name: row.usuario,
+          sucursal: row.sucursal
+        };
+      }).filter(row => {
+        return `${row.sucursal}` === `${request.params.sucursal}` || `${row.sucursal}` === '0'
+      });
+
+      console.log(users)
+      return response.status(200).json(users);
+    } catch (error) {
+      console.log(error);
+      return response
+        .status(502)
+        .json({ error: "Busqueda de usuarios falló!" });
+    }
+  },
+  /**
    * recieves userId<string> => id of the user for log
    * recieves password<string> => password to test
    * recieves sucursal<string> => sucursal

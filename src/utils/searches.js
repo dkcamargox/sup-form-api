@@ -1,5 +1,29 @@
 const { createMaestroConnection } = require("../services/sheetsConnections");
 module.exports = {
+  async getSellerBySucursal(sucursalId) {
+    try {
+      const maestroDoc = await createMaestroConnection();
+
+      const sheet = maestroDoc.sheetsByTitle["vendedores"];
+
+      const rows = await sheet.getRows();
+
+      return rows
+        .map((row) => {
+          return {
+            sucursal: row.sucursal,
+            id: row.id,
+            name: row.nombre
+          };
+        })
+        .filter(
+          (seller) => seller.sucursal === sucursalId
+        );
+    } catch (error) {
+      console.log(error);
+      return null;
+    }
+  },
   async getSupervisorNameById(userId) {
     try {
       const maestroDoc = await createMaestroConnection();

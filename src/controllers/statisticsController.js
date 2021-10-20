@@ -10,7 +10,9 @@ const {
 const { 
     getProductsBySucursalId,
     getSellerNameById,
-    getRouteNameById
+    getRouteNameById,
+    getSellerBySucursal,
+    getSupervisorNameById
 } = require("../utils/searches");
 const surveyController = require("./surveyController");
 
@@ -132,15 +134,20 @@ module.exports = {
             if (`${request.query.filter}` === 'true') {
                 const {
                     selectedSeller,
-                    selectedRoute
+                    selectedRoute,
+                    selectedSupervisor
                 } = request.query;
 
                 const finalDate = new Date(request.query.finalDate)
                 const initialDate = new Date(request.query.initialDate)
                 
+                let supervisor;
                 let seller;
                 let route;
 
+                if (selectedSupervisor !== '') {
+                    supervisor = await getSupervisorNameById(selectedSupervisor)
+                }
                 if (selectedSeller !== '') {
                     seller = await getSellerNameById(request.params.sucursal, selectedSeller)
                 }
@@ -151,25 +158,49 @@ module.exports = {
                 
                 surveyRows = surveyRows.filter(row => {
                     const date = new Date(parseDate(row['Data']))
-
-                    if (selectedSeller === '') {
-                        return (
-                            date >= initialDate &&
-                            date <= finalDate
-                        )
-                    } else if (selectedRoute === '') {
-                        return (
-                            date >= initialDate &&
-                            date <= finalDate &&
-                            row['Preventista'] === seller
-                        )
+                    if (selectedSupervisor === '') {
+                        if (selectedSeller === '') {
+                            return (
+                                date >= initialDate &&
+                                date <= finalDate
+                            )
+                        } else if (selectedRoute === '') {
+                            return (
+                                date >= initialDate &&
+                                date <= finalDate &&
+                                row['Preventista'] === seller
+                            )
+                        } else {
+                            return (
+                                date >= initialDate &&
+                                date <= finalDate &&
+                                row['Preventista'] === seller &&
+                                row['Ruta'] === route
+                            )
+                        }
                     } else {
-                        return (
-                            date >= initialDate &&
-                            date <= finalDate &&
-                            row['Preventista'] === seller &&
-                            row['Ruta'] === route
-                        )
+                        if (selectedSeller === '') {
+                            return (
+                                date >= initialDate &&
+                                date <= finalDate &&
+                                row['Supervisor'] === supervisor
+                            )
+                        } else if (selectedRoute === '') {
+                            return (
+                                date >= initialDate &&
+                                date <= finalDate &&
+                                row['Preventista'] === seller &&
+                                row['Supervisor'] === supervisor
+                            )
+                        } else {
+                            return (
+                                date >= initialDate &&
+                                date <= finalDate &&
+                                row['Preventista'] === seller &&
+                                row['Ruta'] === route &&
+                                row['Supervisor'] === supervisor
+                            )
+                        }
                     }
                 });
                 
@@ -252,6 +283,9 @@ module.exports = {
 
             const coachingsRows = await coachingSheet.getRows();
 
+            const allSellers = await getSellerBySucursal(request.params.sucursal);
+
+
             const coachings = coachingsRows.map(row => {
                 return {
                     'supervisor': row['Supervisor'],
@@ -279,11 +313,16 @@ module.exports = {
                     return new Date(a.MeasureDate) > new Date(b.MeasureDate) ? a : b;
                 });
             })
-
+            
+            
             const coachingDataBySeller = []
-            Object.entries(dataBySeller).forEach(([seller, coaching]) => {
+            Object.entries(dataBySeller).forEach(async ([seller, coaching]) => {
+                console.log(seller)
+                const thisSellerData = allSellers.find(thisSeller => thisSeller.name === seller);
+                console.log(thisSellerData)
                 coachingDataBySeller.push({
-                    seller: seller,
+                    id: thisSellerData.id,
+                    name: seller,
                     coaching: coaching
                 })
             })
@@ -291,6 +330,115 @@ module.exports = {
             return response
                 .status(200)
                 .json(coachingDataBySeller)
+            
+            
+        } catch (error) {
+            console.log(error);
+            return response
+                .status(502)
+                .json({ error: "Busqueda de datos de coachings falló!" });
+        }
+    },
+    async getCoachingHistoryBySellerId(request, response) {
+        
+
+        try {
+            const sucursalDoc = await createSucursalConnection(request.params.sucursal);
+            const coachingSheet = await sucursalDoc.sheetsByTitle["post-coaching"];
+
+            const coachingsRows = await coachingSheet.getRows();
+
+            const sellerName = await getSellerNameById(request.params.sucursal, request.params.sellerId);
+            
+            const coachings = coachingsRows.map(row => {
+                return {
+                    'coachingId': row['_rowNumber'],
+                    'supervisor': row['Supervisor'],
+                    'seller': row['Preventista'],
+                    'sellerId': request.params.sellerId,
+                    'date': new Date(parseDate(row['Data'])),
+                    'coaching': row['Puntaje Final'],
+                    'pop': row['¿POP?'],
+                    'exibition': row['¿Trabaja en una mayor exposición de los productos?'],
+                }
+            }).filter(row => {
+                return row.seller === sellerName
+            });
+            
+            let responseFormated = {};
+            responseFormated['sellerName'] = sellerName;
+            responseFormated['coachings'] = coachings;
+            
+            console.log(responseFormated)
+            
+            return response
+            .status(200)
+                .json(responseFormated)
+            
+            
+        } catch (error) {
+            console.log(error);
+            return response
+                .status(502)
+                .json({ error: "Busqueda de datos de coachings falló!" });
+        }
+    },
+    async getCoachingDataById(request, response) {
+        const parsePercentageToFloat = percentage => {
+            var floatPercentage = parseFloat(percentage); // 20.1
+
+            if(!isNaN(floatPercentage)){
+                floatPercentage /= 100; // .201
+            }
+
+            return floatPercentage
+        }
+
+        try {
+            const sucursalDoc = await createSucursalConnection(request.params.sucursal);
+            const coachingSheet = await sucursalDoc.sheetsByTitle["post-coaching"];
+
+            const coachingsRows = await coachingSheet.getRows();
+
+            const sellerName = await getSellerNameById(request.params.sucursal, request.params.sellerId);
+            
+            const coaching = coachingsRows.map(row => {
+                return {
+                    'coachingId': row['_rowNumber'],
+                    'supervisor': row['Supervisor'],
+                    'seller': row['Preventista'],
+                    'sellerId': request.params.sellerId,
+                    'date': new Date(parseDate(row['Data'])),
+                    total: parsePercentageToFloat(row["Puntaje Final"]),
+                    lastOrder: parsePercentageToFloat(row["¿Indaga sobre el último pedido?"]),
+                    sellPlan: parsePercentageToFloat(row["¿Planifica el pedido antes de ingresar al PDV?"]),
+                    popStat: parsePercentageToFloat(row["¿POP?"]),
+                    stock: parsePercentageToFloat(row["¿Verifica el stock en todas las áreas del PDV?"]),
+                    exposition: parsePercentageToFloat(row["¿Trabaja en una mayor exposición de los productos?"]),
+                    competitorSales: parsePercentageToFloat(row["¿Indaga y verifica la situación y las acciones de la competencia?"]),
+                    sales: parsePercentageToFloat(row["¿Comunica las acciones comerciales vigentes?"]),
+                    sellPropouse: parsePercentageToFloat(row["¿Realiza la propuesta de ventas, ofreciendo todos los productos?"]),
+                    deliveryPrecautions: parsePercentageToFloat(row["¿Toma todos los recaudos necesarios para facilitar la entrega? (pedido, dinero, horario, etc.)"]),
+                    popPricing: parsePercentageToFloat(row["¿Renueva, coloca y pone precios al POP? Siguiendo criterios del PDV"]),
+                    timeManagement: parsePercentageToFloat(row["¿Administra el tiempo de permanencia en el PDV?"]),
+                    catalogue: parsePercentageToFloat(row["¿Uso de Catálogo?"]),
+                    comment: row['Comentarios'],
+                    strongPoints: row['Puntos Fuertes'],
+                    weakPoints: row['Puntos a desarollar']   
+                }
+            }).find(row => {
+                return `${row.coachingId}` === `${request.params.coachingId}`
+            });
+            
+            let responseFormated = {};
+            responseFormated['sellerName'] = sellerName;
+            responseFormated['coaching'] = coaching;
+            
+            console.log(responseFormated)
+            
+            return response
+            .status(200)
+                .json(responseFormated)
             
             
         } catch (error) {
