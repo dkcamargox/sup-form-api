@@ -7,6 +7,7 @@ const {
     getDate,
     getTime,
     parseDate } = require("../utils/dates");
+const { invertedprettyfyTrueFalse } = require("../utils/prettyfiers");
 const { 
     getProductsBySucursalId,
     getSellerNameById,
@@ -209,19 +210,54 @@ module.exports = {
             const numberOfSurveys = surveyRows.map(row => {
                 return row['Supervisor']
             }).length;
+                        
+            
+            // Surveys by sellers
 
+            // getting sellers rows
+            const visitedPDVRows = surveyRows.map(row => {
+                return row['Visitado?']
+            });
+            
+            // parsing from obj to array
+            const visitedPDVCounts = {};
+            visitedPDVRows.forEach(function (x) { visitedPDVCounts[x] = (visitedPDVCounts[x] || 0) + 1; });
+            
+            // threating data to fit react-google-charts
+            const visitedPDVCountsArray = Object.entries(visitedPDVCounts).map(surveyCount => surveyCount);
+            
+            // adding headers
+            visitedPDVCountsArray.push(['Valor', 'Cantidad']);
+
+            // reversing for the headers be on position 0
+            visitedPDVCountsArray.reverse();
+            
+            // clog for debug
+            console.log(visitedPDVCountsArray);
+            
             const productsByType = await getProductsBySucursalId(request.params.sucursal);            
+
+            console.log(productsByType)
             
             const productsPercetageByType = {}
 
             Object.entries(productsByType).forEach(([productsType, products]) => {
                 // getting each product label and parsing to the title sheet format
                 let treatedProductData = products.map(product => {
-                    return [
-                        `hay ${product.label}?`, //cobertura
-                        `tiene afiche de ${product.label}?`, //afiche
-                        `está ${product.label} precificado correctamente?` //precificacion
-                    ]
+                    if (productsType === "redcom") {
+                        return [
+                            `hay ${product.label}?`, //cobertura
+                            `tiene afiche de ${product.label}?`, //afiche
+                            `está ${product.label} precificado correctamente?`, //precificacion
+                            `está ${product.label} exhibido correctamente?` //exhibicion
+                        ]
+                    } else {
+                        return [
+                            `hay ${product.label}?`, //cobertura
+                            `tiene afiche de ${product.label}?`, //afiche
+                            `está ${product.label} precificado correctamente?`, //precificacion
+                        ]
+                    }
                 })
                 
                 // getting product survey info
@@ -256,6 +292,7 @@ module.exports = {
             })
 
             productsPercetageByType['surveyCount']  = numberOfSurveys;
+            productsPercetageByType['visitedPdv']  = visitedPDVCountsArray;
             if (surveyRows.length === 0) {
                 productsPercetageByType['code']  = 1;
             } else {
