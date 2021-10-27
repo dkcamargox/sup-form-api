@@ -404,7 +404,7 @@ module.exports = {
             
             let responseFormated = {};
             responseFormated['sellerName'] = sellerName;
-            responseFormated['coachings'] = coachings;
+            responseFormated['coachings'] = coachings.reverse();
             
             console.log(responseFormated)
             
