@@ -224,8 +224,8 @@ module.exports = {
             visitedPDVRows.forEach(function (x) { visitedPDVCounts[x] = (visitedPDVCounts[x] || 0) + 1; });
             
             // threating data to fit react-google-charts
-            const visitedPDVCountsArray = Object.entries(visitedPDVCounts).map(surveyCount => surveyCount);
-            
+            let visitedPDVCountsArray = Object.entries(visitedPDVCounts).map(surveyCount => surveyCount).sort();
+
             // adding headers
             visitedPDVCountsArray.push(['Valor', 'Cantidad']);
 
