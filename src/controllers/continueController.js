@@ -110,7 +110,7 @@ module.exports = {
      */
     async getContinuesBySupervisor(request, response) {
 
-        const getSellerNameById = (rows, sucursalId, sellerId) => {
+        const getSellerById = (rows, sucursalId, sellerId) => {
 
             return rows.map((row) => {
                 return {
@@ -120,7 +120,7 @@ module.exports = {
                 };
             }).find(
                 (seller) => `${seller.id}` === `${sellerId}` && `${seller.sucursal}` === `${sucursalId}`
-            ).name;
+            );
         };
         
         const getRouteNameById =  (rows, sucursalId, routeId) => {
@@ -129,14 +129,14 @@ module.exports = {
                     sucursal: row.sucursal,
                     id: row.id,
                     name: row.ruta
-                    };  
+                };  
             }).find(
                 (seller) => `${seller.id}` === `${routeId}` && `${seller.sucursal}` === `${sucursalId}`
             ).name;
         };
 
-        const getSellerNameByRouteId = (routesRows, sellersRows, sucursal, routeId) => {
-            const sellerId = routesRows.map((row) => {
+        const getSellerByRouteId = (routesRows, sellersRows, sucursal, routeId) => {
+            const route = routesRows.map((row) => {
                 return {
                     sucursal: row.sucursal,
                     id: row.id,
@@ -144,9 +144,14 @@ module.exports = {
                 };  
             }).find(
                 (route) => `${route.id}` === `${routeId}` && `${route.sucursal}` === `${sucursal}`
-            ).sellerId;
+            );
 
-            return getSellerNameById(sellersRows, sucursal, sellerId);
+            const seller = getSellerById(sellersRows, sucursal, route.sellerId);
+            
+            return {
+                sellerId: seller.id,
+                seller: seller.name
+            }
         };
         
         
@@ -165,12 +170,19 @@ module.exports = {
                 return {
                     id: row['_rowNumber'],
                     route: getRouteNameById(routesRows, request.params.sucursal, row['id ruta']),
-                    seller: getSellerNameByRouteId(
+                    seller: getSellerByRouteId(
                         routesRows,
                         sellersRows,    
                         request.params.sucursal,
                         row['id ruta']
-                    ),
+                    ).seller,
+                    routeId: row['id ruta'],
+                    sellerId: getSellerByRouteId(
+                        routesRows,
+                        sellersRows,    
+                        request.params.sucursal,
+                        row['id ruta']
+                    ).sellerId,
                     formType: row['tipo de formulario'],
                     clientCountage: row['ultimo cargado'],
                     supervisorId: row['id supervisor']

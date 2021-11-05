@@ -83,11 +83,11 @@ routes.get("/coaching-history/:sucursal/:sellerId/:coachingId", getCoachingDataB
  */
 
 // delete data from a created route
-routes.delete("/continue/:sucursal/:id", deleteContinue);
+routes.delete("/continue/:id", deleteContinue);
 // update data from a created route
-routes.put("/continue/:sucursal/:id", updateContinue);
+routes.put("/continue/:id", updateContinue);
 // create a new continue route
-routes.post("/continue/:sucursal", createContinue);
+routes.post("/continue", createContinue);
 // get all continues
 routes.get("/continue/:sucursal/:supervisor", getContinuesBySupervisor)
 
