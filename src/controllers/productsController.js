@@ -101,7 +101,7 @@ module.exports = {
         const surveySheet = sucursalDoc.sheetsByTitle["relevameinto"];
 
         await surveySheet.loadHeaderRow();
-        const imutableHeaders = surveySheet.headerValues.slice(0, 14);
+        const imutableHeaders = surveySheet.headerValues.slice(0, 15);
 
         /**
          * IN CASE YOU ARE WONDERING THIS IS WHERE WE SELECT THE PRODUCTS BY SUCURSAL

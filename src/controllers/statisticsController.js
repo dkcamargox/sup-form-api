@@ -218,7 +218,6 @@ module.exports = {
             const visitedPDVRows = surveyRows.map(row => {
                 return row['Visitado?']
             });
-            
             // parsing from obj to array
             const visitedPDVCounts = {};
             visitedPDVRows.forEach(function (x) { visitedPDVCounts[x] = (visitedPDVCounts[x] || 0) + 1; });
@@ -232,7 +231,29 @@ module.exports = {
             // reversing for the headers be on position 0
             visitedPDVCountsArray.reverse();
             
+            // getting sellers rows
+            const mixPDVRows = surveyRows.map(row => {
+                return row['Mix?']
+            }).filter(row => {
+                return row !== ''
+            });
+
+            // parsing from obj to array
+            const mixPDVCounts = {};
+            mixPDVRows.forEach(function (x) { mixPDVCounts[x] = (mixPDVCounts[x] || 0) + 1; });
+            
+            // threating data to fit react-google-charts
+            let mixPDVCountsArray = Object.entries(mixPDVCounts).map(surveyCount => surveyCount).sort();
+
+            // adding headers
+            mixPDVCountsArray.push(['Valor', 'Cantidad']);
+
+            // reversing for the headers be on position 0
+            mixPDVCountsArray.reverse();
+            
+            
             // clog for debug
+            console.log(mixPDVCountsArray);
             console.log(visitedPDVCountsArray);
             
             const productsByType = await getProductsBySucursalId(request.params.sucursal);            
@@ -270,6 +291,9 @@ module.exports = {
                             // return the data in the column
                             return row[productLabel]
                         })
+                        .filter(row => {
+                            return row !== ''
+                        })
                         .forEach(function (x) { surveyCounts[x] = (surveyCounts[x] || 0) + 1; }); //count the times of yes and no for taking data
                         const aux = {}
     
@@ -293,6 +317,7 @@ module.exports = {
 
             productsPercetageByType['surveyCount']  = numberOfSurveys;
             productsPercetageByType['visitedPdv']  = visitedPDVCountsArray;
+            productsPercetageByType['mixedPdv']  = mixPDVCountsArray;
             if (surveyRows.length === 0) {
                 productsPercetageByType['code']  = 1;
             } else {
