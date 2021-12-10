@@ -387,7 +387,11 @@ module.exports = {
                     name: seller,
                     coaching: coaching
                 })
-            })
+            });
+            
+            // sorting by id
+            coachingDataBySeller.sort((a, b) => (a.id - b.id));
+
             console.log(coachingDataBySeller)
             return response
                 .status(200)
