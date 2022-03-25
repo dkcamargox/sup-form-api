@@ -1,5 +1,5 @@
-const { createMaestroConnection } = require("../services/sheetsConnections");
-const { getUsers } = require("./usersController");
+const pool = require('../services/connection');
+
 module.exports = {
   /**
    * recieves the supervisor id path
@@ -7,44 +7,19 @@ module.exports = {
    */
   async getSellers(request, response) {
     try {
-      const maestroDoc = await createMaestroConnection();
-
-      const sheet = maestroDoc.sheetsByTitle["vendedores"];
-
-      const rows = await sheet.getRows();
-
-      const sellers = rows.map((row) => {
+      const { rows } = await pool.query('SELECT * FROM sellers WHERE branch_id=$1;', [request.params.sucursal]);
+        
+      const sellers = rows.map(({id, name, branch_id}) => {
         return {
-          id: row.id,
-          name: row.nombre,
-          sup_id: row["id supervisor"],
-          sucursal: row.sucursal
+          id: `${id}`,
+          name,
+          sucursal: branch_id
         };
       });
 
-      const supervisorsSheet = maestroDoc.sheetsByTitle["usuarios"];
 
-      const supervisorsRows = await supervisorsSheet.getRows();
-
-      const supervisors = supervisorsRows.map((supervisorsRow) => {
-        return {
-          id: supervisorsRow.id,
-          name: supervisorsRow.usuario,
-          sucursal: supervisorsRow.sucursal,
-          roll: supervisorsRow.roll
-        };
-      });
-      const supervisor = supervisors.find((user) => {
-        return user.id === `${request.params.supervisor}`;
-      });
-
-      let filteredSellers;
-      
-      filteredSellers = sellers.filter((seller) => {
-        return `${request.params.sucursal}` === seller.sucursal;
-      });
-
-      return response.status(200).json(filteredSellers);
+      console.log(sellers);
+      return response.status(200).json(sellers);
     } catch (error) {
       console.log(error);
       return response
@@ -55,34 +30,22 @@ module.exports = {
 
   async getRoutes(request, response) {
     try {
-      const maestroDoc = await createMaestroConnection();
-
-      const sheet = maestroDoc.sheetsByTitle["rutas"];
-
-      const rows = await sheet.getRows();
-
-      const routes = rows.map((row) => {
+      const { rows } = await pool.query('SELECT * FROM routes WHERE seller_id=$1;', [request.params.seller_id]);
+        
+      const routes = rows.map(({id, name, seller_id}) => {
         return {
-          id: row.id,
-          seller_id: row["id vendedor"],
-          name: row.ruta,
-          sucursal: row.sucursal
+          id: `${id}`,
+          name,
         };
       });
 
-      const filteredRoutes = routes.filter((route) => {
-        return (
-          `${request.params.seller_id}` === route.seller_id &&
-          `${request.params.sucursal}` === route.sucursal
-        );
-      });
-
-      return response.status(200).json(filteredRoutes);
+      console.log(routes);
+      return response.status(200).json(routes);
     } catch (error) {
       console.log(error);
       return response
         .status(502)
-        .json({ error: "Busqueda de vendedores falló!" });
+        .json({ error: "Busqueda de rutas por vendedor falló!" });
     }
   }
 };

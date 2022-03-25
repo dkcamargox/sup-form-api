@@ -8,7 +8,11 @@
   "license": "MIT",
   "private": false,
   "nodemonConfig": {
-    "ignore": ["node_modules/*", "LICENSE", "README.md"]
+    "ignore": [
+      "node_modules/*",
+      "LICENSE",
+      "README.md"
+    ]
   },
   "scripts": {
     "dev": "nodemon ./src/index.js",
@@ -20,7 +24,8 @@
     "express": "^4.17.1",
     "google-spreadsheet": "^3.1.15",
     "googleapis": "^76.0.0",
-    "moment-timezone": "^0.5.33"
+    "moment-timezone": "^0.5.33",
+    "pg": "^8.7.3"
   },
   "devDependencies": {
     "nodemon": "^2.0.7"

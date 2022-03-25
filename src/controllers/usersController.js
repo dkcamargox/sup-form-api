@@ -3,26 +3,61 @@ const {
   createSucursalConnection
 } = require("../services/sheetsConnections");
 const { getDate, getTime } = require("../utils/dates");
+
+const pool = require('../services/connection');
+
 module.exports = {
   /**
    * return a list of users object => { id, name }
    */
   async getUsers(request, response) {
     try {
-      const maestroDoc = await createMaestroConnection();
-
-      const sheet = maestroDoc.sheetsByTitle["usuarios"];
-
-      const rows = await sheet.getRows();
-
-      const users = rows.map((row) => {
+      const { rows } = await pool.query('SELECT *  FROM supervisors');
+        
+      const supervisors = rows.map(({id, name}) => {
         return {
-          id: row.id,
-          name: row.usuario
+          id: `${id}`,
+          name
         };
       });
-      console.log(users)
-      return response.status(200).json(users);
+
+
+      console.log(supervisors)
+      return response.status(200).json(supervisors)
+    } catch (error) {
+      console.log(error);
+      return response
+        .status(502)
+        .json({ error: "Busqueda de usuarios falló!" });
+    }
+  },
+  async getLoginData(request, response) {
+    try {
+      const { rows: rowsSupervisores } = await pool.query('SELECT *  FROM supervisors;');
+      const { rows: rowsBranches } = await pool.query('SELECT *  FROM branches;');
+      console.log(rowsBranches)
+        
+      const supervisors = rowsSupervisores.map(({id, name}) => {
+        return {
+          id: `${id}`,
+          name
+        };
+      });
+
+      
+      const branches = rowsBranches.map(({id, name}) => {
+        return {
+          id: `${id}`,
+          name
+        };
+      });
+
+
+      console.log(supervisors)
+      return response.status(200).json({
+        supervisors,
+        branches
+      });
     } catch (error) {
       console.log(error);
       return response
@@ -35,24 +70,27 @@ module.exports = {
    */
   async getUsersBySucursal(request, response) {
     try {
-      const maestroDoc = await createMaestroConnection();
+      const { rows } = await pool.query(
+        'SELECT supervisors.id, supervisors.name\
+          FROM supervisors_branches, branches, supervisors\
+          WHERE supervisors_branches.supervisor_id = supervisors.id\
+          AND supervisors_branches.branch_id = branches.id\
+          AND branches.id = $1;', 
+        [request.params.sucursal]
+      );
 
-      const sheet = maestroDoc.sheetsByTitle["usuarios"];
-
-      const rows = await sheet.getRows();
-
-      const users = rows.map((row) => {
+      console.log(rows)
+        
+      const supervisors = rows.map(({id, name}) => {
         return {
-          id: row.id,
-          name: row.usuario,
-          sucursal: row.sucursal
+          id: `${id}`,
+          name
         };
-      }).filter(row => {
-        return `${row.sucursal}` === `${request.params.sucursal}` || `${row.sucursal}` === '0'
       });
 
-      console.log(users)
-      return response.status(200).json(users);
+
+      console.log(supervisors)
+      return response.status(200).json(supervisors)
     } catch (error) {
       console.log(error);
       return response

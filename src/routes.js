@@ -1,6 +1,6 @@
 const express = require("express");
 const routes = express.Router();
-const { getUsers, logIn, getUsersBySucursal } = require("./controllers/usersController");
+const { getLoginData, getUsers, logIn, getUsersBySucursal } = require("./controllers/usersController");
 const { getSellers, getRoutes } = require("./controllers/sellersController");
 const { postSurvey } = require("./controllers/surveyController");
 
@@ -33,6 +33,7 @@ const {
 /**
  * INFO ROUTES
  */
+routes.get("/login-data", getLoginData)
 // get list of users
 routes.get("/users", getUsers);
 // get list of users by sucursal
@@ -40,7 +41,7 @@ routes.get("/users/:sucursal", getUsersBySucursal);
 // get list of sellers by sucursal and supervisor
 routes.get("/sellers/:sucursal/:supervisor", getSellers);
 // get list of routes by seller and suc
-routes.get("/routes/:sucursal/:seller_id", getRoutes);
+routes.get("/routes/:seller_id", getRoutes);
 /**
  * SURVEY FORM ROUTES
  */
