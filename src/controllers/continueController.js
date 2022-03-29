@@ -1,3 +1,7 @@
+const { getDate } = require('../utils/dates');
+
+const pool = require('../services/connection');
+
 const {
     createMaestroConnection
 } = require("../services/sheetsConnections");
@@ -10,52 +14,68 @@ module.exports = {
      * @returns 
      */
     async createContinue(request, response) {
+        const client = await pool.connect()
         try {
-            
-            const maestroDoc = await createMaestroConnection();
+            console.log('CREATE CONTINUE');
+            console.log(`REQUEST ${request.body}`);
 
-            const continueSheet = maestroDoc.sheetsByTitle["continuar"];
+            const { supervisor, route, formType, sucursal } = request.body;
 
-            console.log(request.body);
-
-            let rowId;
+            await client.query('BEGIN');
+            const { rows: continuesRows } = await pool.query(
+                'INSERT INTO continues(route_id, date, supervisor_id, type, countage) VALUES($1,$2,$3, $4, $5) RETURNING id;',
+                [
+                    parseInt(route),
+                    getDate(),
+                    parseInt(supervisor),
+                    formType,
+                    0
+                ]   
+            );
+            const continueId = continuesRows[0].id;
 
             if(request.body.formType === 'coaching') {
-                rowId = await continueSheet.addRow({
-                    'id supervisor': request.body.supervisor,
-                    'id ruta': request.body.route,
-                    'tipo de formulario': request.body.formType,
-                    'ultimo cargado': 0,
-                    '¿Indaga sobre el último pedido?': 0,
-                    '¿Planifica el pedido antes de ingresar al PDV?': 0,
-                    '¿POP?': 0,
-                    '¿Verifica el stock en todas las áreas del PDV?': 0,
-                    '¿Trabaja en una mayor exposición de los productos?': 0,
-                    '¿Indaga y verifica la situación y las acciones de la competencia?': 0,
-                    '¿Comunica las acciones comerciales vigentes?': 0,
-                    '¿Realiza la propuesta de ventas, ofreciendo todos los productos?': 0,
-                    '¿Toma todos los recaudos necesarios para facilitar la entrega? (pedido, dinero, horario, etc.)': 0,
-                    '¿Renueva, coloca y pone precios al POP? Siguiendo criterios del PDV': 0,
-                    '¿Administra el tiempo de permanencia en el PDV?': 0,
-                    '¿Uso de Catálogo?': 0,
-                });
-            } else {
-                rowId = await continueSheet.addRow({
-                    'id supervisor': request.body.supervisor,
-                    'id ruta': request.body.route,
-                    'tipo de formulario': request.body.formType,
-                    'ultimo cargado': 0,
-                });
-            }
-            console.log({ error: false, id: rowId['_rowNumber'] });
+                /**
+                 * add stats
+                 * add continues_stats
+                 */
+                const { rows: statsRows } = await pool.query(
+                    'INSERT INTO stats(\
+                        last_order,\
+                        sell_plan,\
+                        pop,\
+                        stock,\
+                        exposition,\
+                        competitor_sales,\
+                        sales,\
+                        sell_propouse,\
+                        delivery_precautions,\
+                        pop_pricing,\
+                        time_management,\
+                        catalogue\
+                    ) VALUES(\
+                        0,0,0,0,0,0,0,0,0,0,0,0\
+                    ) RETURNING id;'
+                );
+                const statId = statsRows[0].id;
 
+                await pool.query(
+                    'INSERT INTO continues_stats(continue_id, stat_id) VALUES($1,$2) RETURNING id;',
+                    [continueId, statId]
+                );
+            } 
+            
+            await client.query('COMMIT');
+            
+            
             return response
                 .status(200)
-                .json({ error: false, id: rowId['_rowNumber'] });
+                .json({ error: false, id: continueId });
 
         } catch (error) {
             console.log(error);
-            return response.status(502).json({ error: "create continue falló" });
+            await client.query('ROLLBACK');
+            return response.status(502).json({ error: "Falla al crear el continue de la ruta" });
         }
     },
     /**
@@ -65,28 +85,41 @@ module.exports = {
      * @returns 
      */
     async deleteContinue(request, response) {
+        console.log('DELETE CONTINUES BY SUPERVISOR');
+        console.log('REQUEST');
+        console.log(request.params);
+
+        const client = await pool.connect()
+        const id = parseInt(request.params.id)
+        await client.query('BEGIN');
+
         try {
-            
-            const maestroDoc = await createMaestroConnection();
+            const { rowCount } = await client.query('SELECT 1 FROM continues_stats WHERE continue_id = $1', [id]);
 
-            const continueSheet = maestroDoc.sheetsByTitle["continuar"];
+            if (rowCount) {
+                // deleting relation if exists (if its a coaching)
+                const { rows: continuesStatsRows } = await client.query(
+                    'DELETE FROM continues_stats WHERE continue_id = $1 RETURNING stat_id',
+                    [id]
+                );
+                const statId = continuesStatsRows[0].stat_id;
 
-            const continueRows = await continueSheet.getRows();
-            
-            const row = await continueRows.find(row => {
-                return `${row['_rowNumber']}` === `${request.params.id}`;
-            });
+                // deleting from stats
+                await client.query(
+                    'DELETE FROM stats WHERE id = $1',
+                    [statId]
+                );
+            }
 
-            row.delete();
-
-            console.log({ error: false, id: request.params.id });
+            await client.query('DELETE FROM continues WHERE id = $1', [id]);
+            client.query('COMMIT');
 
             return response
                 .status(200)
-                .json({ error: false, id: request.params.id });
-                
+                .json({ error: false, id: id });
         } catch (error) {
             console.log(error);
+            client.query('ROLLBACK');
             return response.status(502).json({ error: "delete continue falló" });
         }
     },
@@ -97,43 +130,72 @@ module.exports = {
      * @returns 
      */
     async updateContinue(request, response) {
+        console.log('UPDATE CONTINUES BY ID');
+        console.log(`REQUEST`);
+        console.log(request.params);
+        console.log(request.body);
+
+        const client = await pool.connect()
+        
+        const { 
+            id
+        } = request.params;
+
         try {
             
-            const maestroDoc = await createMaestroConnection();
+            await client.query('BEGIN');
 
-            const continueSheet = maestroDoc.sheetsByTitle["continuar"];
+            const { rows: continuesRows } = await pool.query(
+                'UPDATE continues SET countage=$2 WHERE id=$1 RETURNING type;',
+                [
+                    request.params.id,
+                    request.body.countage
+                ]   
+            );
+            const continueType = continuesRows[0].type;
 
-            const continueRows = await continueSheet.getRows();
+            if(continueType === 'coaching') {
+                /**
+                 * add stats
+                 * add continues_stats
+                 */
+                await pool.query(
+                    'UPDATE stats SET\
+                        last_order=$2,\
+                        sell_plan=$3,\
+                        pop=$4,\
+                        stock=$5,\
+                        exposition=$6,\
+                        competitor_sales=$7,\
+                        sales=$8,\
+                        sell_propouse=$9,\
+                        delivery_precautions=$10,\
+                        pop_pricing=$11,\
+                        time_management=$12,\
+                        catalogue=$13\
+                    WHERE id = (SELECT stat_id FROM continues_stats WHERE continue_id = $1);',
+                    [
+                        request.params.id,
+                        request.body.stats.lastOrder,
+                        request.body.stats.sellPlan,
+                        request.body.stats.pop,
+                        request.body.stats.stock,
+                        request.body.stats.exposition,
+                        request.body.stats.competitorSales,
+                        request.body.stats.sales,
+                        request.body.stats.sellPropouse,
+                        request.body.stats.deliveryPrecautions,
+                        request.body.stats.popPricing,
+                        request.body.stats.timeManagement,
+                        request.body.stats.catalogue
+                    ]
+                );
+            } 
             
-            const row = await continueRows.find(row => {
-                return `${row['_rowNumber']}` === `${request.params.id}`;
-            });
-
-            row['ultimo cargado'] = request.body.countage;
-
-            if (row['tipo de formulario'] === 'coaching') {
-                row['¿Indaga sobre el último pedido?'] = request.body.stats.lastOrder
-                row['¿Planifica el pedido antes de ingresar al PDV?'] = request.body.stats.sellPlan
-                row['¿POP?'] = request.body.stats.pop
-                row['¿Verifica el stock en todas las áreas del PDV?'] = request.body.stats.stock
-                row['¿Trabaja en una mayor exposición de los productos?'] = request.body.stats.exposition
-                row['¿Indaga y verifica la situación y las acciones de la competencia?'] = request.body.stats.competitorSales
-                row['¿Comunica las acciones comerciales vigentes?'] = request.body.stats.sales
-                row['¿Realiza la propuesta de ventas, ofreciendo todos los productos?'] = request.body.stats.sellPropouse
-                row['¿Toma todos los recaudos necesarios para facilitar la entrega? (pedido, dinero, horario, etc.)'] = request.body.stats.deliveryPrecautions
-                row['¿Renueva, coloca y pone precios al POP? Siguiendo criterios del PDV'] = request.body.stats.popPricing
-                row['¿Administra el tiempo de permanencia en el PDV?'] = request.body.stats.timeManagement
-                row['¿Uso de Catálogo?'] = request.body.stats.catalogue
-            }
-
-            await row.save();
-
-            console.log({ error: false, id: request.params.id });
-
+            await client.query('COMMIT');
             return response
                 .status(200)
                 .json({ error: false, id: request.params.id });
-                
         } catch (error) {
             console.log(error);
             return response.status(502).json({ error: "delete continue falló" });
@@ -146,146 +208,74 @@ module.exports = {
      * @returns 
      */
     async getContinuesBySupervisor(request, response) {
-        console.log(request.params)
-
-        const getSellerById = (rows, sucursalId, sellerId) => {
-
-            return rows.map((row) => {
-                return {
-                    sucursal: row.sucursal,
-                    id: row.id,
-                    name: row.nombre
-                };
-            }).find(
-                (seller) => `${seller.id}` === `${sellerId}` && `${seller.sucursal}` === `${sucursalId}`
-            );
-        };
-        
-        const getRouteNameById =  (rows, routeId) => {
-            return rows.map((row) => {
-                return {
-                    sucursal: row.sucursal,
-                    id: row.id,
-                    name: row.ruta
-                };  
-            }).find(
-                (route) => `${route.id}` === `${routeId}`
-            ).name
-        };
-
-        const getRouteSucursal =  (rows, routeId) => {
-            return rows.map((row) => {
-                return {
-                    sucursal: row.sucursal,
-                    id: row.id,
-                    name: row.ruta
-                };  
-            }).find(
-                (route) => `${route.id}` === `${routeId}`
-            ).sucursal
-        };
-
-        const getSellerByRouteId = (routesRows, sellersRows, routeId) => {
-            const route = routesRows.map((row) => {
-                return {
-                    sucursal: row.sucursal,
-                    id: row.id,
-                    sellerId: row['id vendedor']
-                };  
-            }).find(
-                (route) => `${route.id}` === `${routeId}`
-            );
-
-            const seller = getSellerById(sellersRows, route.sucursal, route.sellerId);
-            
-            return {
-                sellerId: seller.id,
-                seller: seller.name
-            }
-        };
-        
+        console.log('GET CONTINUES BY SUPERVISOR');
+        console.log(`REQUEST ${request.body}`);
+        const { 
+            sucursal,
+            supervisor
+        } = request.params;
         
         try {
+            const { rows: continueRows } = await pool.query(
+                "SELECT\
+                c.id,\
+                b.name AS sucursal,\
+                r.name AS route, \
+                sl.name AS seller_name,\
+                r.id AS route_id, \
+                sl.id AS seller_id,\
+                c.type AS form_type,\
+                sp.name AS supervisor,\
+                c.countage AS client_countage,\
+                sp.id AS supervisor_id,\
+                c.date\
+                FROM continues AS c, supervisors AS sp, routes AS r, sellers AS sl, branches as b WHERE \
+                r.id = c.route_id AND \
+                sl.id = r.seller_id AND\
+                sl.branch_id = b.id AND\
+                sp.id = c.supervisor_id AND\
+                b.id = $1 AND\
+                c.supervisor_id = $2\
+                ORDER BY c.type, c.date;",
+                [sucursal, supervisor]
+            );
+
+            const { rows: statsRows } = await pool.query(
+                "SELECT\
+                c.id,\
+                s.last_order,\
+                s.sell_plan,\
+                s.pop,\
+                s.stock,\
+                s.exposition,\
+                s.competitor_sales,\
+                s.sales,\
+                s.sell_propouse,\
+                s.delivery_precautions,\
+                s.pop_pricing,\
+                s.time_management,\
+                s.catalogue \
+                FROM continues AS c, continues_stats AS cs, stats AS s WHERE \
+                cs.continue_id = c.id AND\
+                cs.stat_id = s.id;"
+            )
             
-            const maestroDoc = await createMaestroConnection();
-
-            const continueSheet = maestroDoc.sheetsByTitle["continuar"];
-            const continueRows = await continueSheet.getRows();
-
-            const routesRows = await maestroDoc.sheetsByTitle["rutas"].getRows();
-            const sellersRows = await maestroDoc.sheetsByTitle["vendedores"].getRows();
-
-            
-            const rows = await continueRows.map(row => {
-                if (row['tipo de formulario'] === 'relevamiento') {
-                    return {
-                        id: row['_rowNumber'],
-                        sucursal: getRouteSucursal(routesRows, row['id ruta']),
-                        route: getRouteNameById(routesRows, row['id ruta']),
-                        seller: getSellerByRouteId(
-                            routesRows,
-                            sellersRows,
-                            row['id ruta']
-                        ).seller,
-                        routeId: row['id ruta'],
-                        sellerId: getSellerByRouteId(
-                            routesRows,
-                            sellersRows, 
-                            row['id ruta']
-                        ).sellerId,
-                        formType: row['tipo de formulario'],
-                        clientCountage: row['ultimo cargado'],
-                        supervisorId: row['id supervisor']
-                    };
-                } else {
-                    return {
-                        id: row['_rowNumber'],
-                        sucursal: getRouteSucursal(routesRows, row['id ruta']),
-                        route: getRouteNameById(routesRows, row['id ruta']),
-                        seller: getSellerByRouteId(
-                            routesRows,
-                            sellersRows,
-                            row['id ruta']
-                        ).seller,
-                        routeId: row['id ruta'],
-                        sellerId: getSellerByRouteId(
-                            routesRows,
-                            sellersRows,
-                            row['id ruta']
-                        ).sellerId,
-                        formType: row['tipo de formulario'],
-                        clientCountage: row['ultimo cargado'],
-                        supervisorId: row['id supervisor'],
-                        stats: {
-                            lastOrder: Number(row['¿Indaga sobre el último pedido?']),
-                            sellPlan: Number(row['¿Planifica el pedido antes de ingresar al PDV?']),
-                            pop: Number(row['¿POP?']),
-                            stock: Number(row['¿Verifica el stock en todas las áreas del PDV?']),
-                            exposition: Number(row['¿Trabaja en una mayor exposición de los productos?']),
-                            competitorSales: Number(row['¿Indaga y verifica la situación y las acciones de la competencia?']),
-                            sales: Number(row['¿Comunica las acciones comerciales vigentes?']),
-                            sellPropouse: Number(row['¿Realiza la propuesta de ventas, ofreciendo todos los productos?']),
-                            deliveryPrecautions: Number(row['¿Toma todos los recaudos necesarios para facilitar la entrega? (pedido, dinero, horario, etc.)']),
-                            popPricing: Number(row['¿Renueva, coloca y pone precios al POP? Siguiendo criterios del PDV']),
-                            timeManagement: Number(row['¿Administra el tiempo de permanencia en el PDV?']),
-                            catalogue: Number(row['¿Uso de Catálogo?'])
-                        }
-                    };
-                    
+            const continues = continueRows.map(continueRow => {
+                return {
+                    ...continueRow,
+                    stats: statsRows.find(statsRow => statsRow.id === continueRow.id)
                 }
-            }).filter(row => {
-                return `${row.supervisorId}` === `${request.params.supervisor}` && `${row.sucursal}` === `${request.params.sucursal}`
             });
 
-            console.log(rows);
+            console.log(continues)
 
             return response
                 .status(200)
-                .json(rows);
+                .json(continues);
                 
         } catch (error) {
             console.log(error);
-            return response.status(502).json({ error: "delete continue falló" });
+            return response.status(502).json({ error: "busqueda de continuaciones falló" });
         }
     }
 };

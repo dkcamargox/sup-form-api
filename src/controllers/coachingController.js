@@ -7,21 +7,23 @@ const {
 } = require("../utils/searches");
 const { prettyfyTrueFalse } = require("../utils/prettyfiers");
 
+const pool = require('../services/connection');
+
 module.exports = {
   /**
    * recieves pre-coaching data loads to spreadsheet
    */
   async postPreCoaching(request, response) {
+    console.log('POST PRE COACHING');
+    console.log(`REQUEST`);
+    console.log(`seller: ${request.body.seller}`);
+    console.log(`route: ${request.body.route}`);
+
+    const client = await pool.connect();
+
     try {
-      console.log(request.body);
-      const sucursalDoc = await createSucursalConnection(request.body.sucursal);
-      const surveySheet = sucursalDoc.sheetsByTitle["pre-coaching"];
 
-      const { supervisor, seller, route, cordy, cordx } = request.body;
-
-      const supervisorName = await getSupervisorNameById(supervisor);
-      const sellerName = await getSellerNameById(request.body.sucursal, seller);
-      const routeName = await getRouteNameById(request.body.sucursal, route);
+      const { supervisor, route, cordy, cordx } = request.body;
 
       const {
         uniformPop,
@@ -35,38 +37,50 @@ module.exports = {
         laws
       } = request.body;
 
-      surveySheet.addRow({
-        Supervisor: supervisorName,
-        Preventista: sellerName,
-        Ruta: routeName,
-        Data: getDate(),
-        Hora: getTime(),
-        Latitud: cordy,
-        Longitud: cordx,
-        "¿Tiene el uniforme correspondiente, el kit básico y suficiente material POP?": prettyfyTrueFalse(
-          uniformPop
-        ),
-        "¿Conoce el avance de las marcas y los objetivos del día, plani,ficados para los principales calibres?": prettyfyTrueFalse(
-          dailyGoal
-        ),
-        "¿Conoce los precios de los 6 principales prod,uctos que vende?": prettyfyTrueFalse(
-          price
-        ),
-        "¿Conoce el estado de los afi,ches en la ruta?": prettyfyTrueFalse(
-          posters
-        ),
-        "¿Planifica la ruta del día?": prettyfyTrueFalse(plan),
-        "¿Conoce las acci,ones del día y sus respectivos precios?": prettyfyTrueFalse(
-          sales
-        ),
-        "¿Utiliza casco?": prettyfyTrueFalse(helmet),
-        "¿Conduce sin utilizar celular?": prettyfyTrueFalse(noCellphone),
-        "¿Respeta leyes de transito?": prettyfyTrueFalse(laws)
-      });
+      await client.query('BEGIN');
+      
+      await client.query(
+        'INSERT INTO pre_coachings(\
+        supervisor_id,\
+        route_id,\
+        date,\
+        time,\
+        cordx,\
+        cordy,\
+        uniform_pop,\
+        daily_goal,\
+        price,\
+        posters,\
+        plan,\
+        sales,\
+        helmet,\
+        no_cellphone,\
+        laws\
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',
+      [
+        supervisor,
+        route,
+        getDate(),
+        getTime(),
+        cordx,
+        cordy,
+        uniformPop==='true' ? true : false,
+        dailyGoal==='true' ? true : false,
+        price==='true' ? true : false,
+        posters==='true' ? true : false,
+        plan==='true' ? true : false,
+        sales==='true' ? true : false,
+        helmet==='true' ? true : false,
+        noCellphone==='true' ? true : false,
+        laws==='true' ? true : false
+      ]);
+      
+      client.query('COMMIT');
 
       return response.status(200).json();
     } catch (error) {
       console.log(error);
+      client.query('ROLLBACK');
       return response
         .status(502)
         .json({ error: "Cadastro de Pre Coaching falló" });

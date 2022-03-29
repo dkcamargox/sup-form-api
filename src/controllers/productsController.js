@@ -1,150 +1,49 @@
-const {
-  createMaestroConnection,
-  createSucursalConnection
-} = require("../services/sheetsConnections");
-const { getAllProductsDataBySucursalId } = require("../utils/searches");
+const pool = require('../services/connection');
+
 module.exports = {
   /**
    * return a list of users object => { id, name }
    */
   async getProductsById(request, response) {
-    const tableId = (tableString) => {
-      return {
-        "Competencia de Aguas": "water",
-        "Competencia de Gaseosas": "soda",
-        "Competencia de Vinos": "wine",
-        "Productos Redcom": "redcom"
-      }[tableString];
-    };
-    const isAnulado = (string) => (string === "No" ? false : true);
-
     try {
-      const maestroDoc = await createMaestroConnection();
+      const { rows } = await pool.query(
+        'SELECT\
+        p.id,\
+        p.name,\
+        p.label,\
+        t.name AS type,\
+        b.name AS sucursal FROM\
+        products AS p,\
+        products_types_branches AS pbt,\
+        types AS t,\
+        branches AS b WHERE\
+        pbt.product_id = p.id AND\
+        pbt.branch_id = b.id AND\
+        pbt.type_id = t.id AND\
+        b.id = $1'
+        , 
+        [request.params.sucursal]
+      );
 
-      const sheet = maestroDoc.sheetsByTitle["lineas"];
+      let products = rows.map( ({id, name, label, type}) => ({
+        id: `${id}`,
+        label,
+        name,
+        type
+      }))
 
-      const rows = await sheet.getRows();
-      const sucursalLines = rows
-        .map((row) => {
-          // linea	label	sucursal	table
-          return {
-            linea: row.linea,
-            label: row.label,
-            sucursal: row.sucursal,
-            table: tableId(row.table),
-            notNull: !isAnulado(row.anulado)
-          };
-        })
-        .filter(
-          (line) =>
-            line.sucursal.includes(request.params.sucursal) && line.notNull
-        );
+      products = products.reduce(
+        (acc, item) => ({
+          ...acc,
+          [item.type]: [...(acc[item.type] ?? []), item],
+        }),
+        {},
+      );
 
-      const treatedSucursalLines = {
-        water: sucursalLines
-          .filter((line) => line.table === "water")
-          .map((waterLine) => {
-            return JSON.parse(`{
-              "label": "${waterLine.label}",
-              "name": "${waterLine.linea}"
-            }`);
-          }),
-        redcom: sucursalLines
-          .filter((line) => line.table === "redcom")
-          .map((redcomLine) => {
-            return JSON.parse(`{
-              "label": "${redcomLine.label}",
-              "name": "${redcomLine.linea}"
-            }`);
-          }),
-        soda: sucursalLines
-          .filter((line) => line.table === "soda")
-          .map((sodaLine) => {
-            return JSON.parse(`{
-              "label": "${sodaLine.label}",
-              "name": "${sodaLine.linea}"
-            }`);
-          }),
-        wine: sucursalLines
-          .filter((line) => line.table === "wine")
-          .map((sodaLine) => {
-            return JSON.parse(`{
-              "label": "${sodaLine.label}",
-              "name": "${sodaLine.linea}"
-            }`);
-          }),
-        
-      };
-      console.log(treatedSucursalLines)
-      return response.status(200).json(treatedSucursalLines);
+      return response.status(200).json(products)
     } catch (error) {
       console.log(error);
-      return response.status(502).json({ error: "Busqueda de lineas falló!" });
+      return response.status(502).json({ error: "Busqueda de lineas de productos falló!" });
     }
-  },
-  async updateProducts(request, response) {
-    // use react-chartjs-2
-    /**
-     * TODO:
-     * UPDATE ALL SUCURSAL SHEETS HEADERS
-     * GET HEADERS
-     * SEPARATE THE IMUTABLE HEADERS
-     * CREATE AN ARRAY WITH THE NEW ONES (RE RIGHT THE MUTABLES)
-     * JOIN THE ARRAYS
-     * SET HEADERS TO THE JOINED ARRAY
-     * RETURN
-     * Comentarios acerca de los problemas de logistica
-     */
-    ["1", "2", "3"].forEach(async (sucursalId) => {
-      try {
-        const sucursalDoc = await createSucursalConnection(sucursalId);
-        const surveySheet = sucursalDoc.sheetsByTitle["relevameinto"];
-
-        await surveySheet.loadHeaderRow();
-        const imutableHeaders = surveySheet.headerValues.slice(0, 15);
-
-        /**
-         * IN CASE YOU ARE WONDERING THIS IS WHERE WE SELECT THE PRODUCTS BY SUCURSAL
-         */
-        const productsData = await getAllProductsDataBySucursalId(sucursalId);
-
-        let mutableHeaders = [];
-
-        productsData.forEach((productData) => {
-          /**
-           * only redcom products are exhibition evaluated
-           */
-          if (productData.table === "redcom") {
-            return mutableHeaders.push(
-              `hay ${productData.label}?`,
-              `tiene afiche de ${productData.label}?`,
-              `está ${productData.label} precificado correctamente?`,
-              `está ${productData.label} exhibido correctamente?`
-            );
-          } else {
-            return mutableHeaders.push(
-              `hay ${productData.label}?`,
-              `tiene afiche de ${productData.label}?`,
-              `está ${productData.label} precificado correctamente?`
-            );
-          }
-        });
-
-        console.log(mutableHeaders);
-
-        const newHeaders = [...imutableHeaders, ...mutableHeaders];
-        await surveySheet.resize({
-          rowCount: surveySheet.rowCount,
-          columnCount: newHeaders.length + 2
-        });
-
-        await surveySheet.setHeaderRow(newHeaders);
-
-        return response.status(200).json();
-      } catch (error) {
-        console.log(error);
-        return response.status(502);
-      }
-    });
   }
 };

@@ -14,7 +14,7 @@ module.exports = {
     getTime() {
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-        const currentTime = moment().tz('America/Argentina/Cordoba').format('hh:mm');
+        const currentTime = moment().tz('America/Argentina/Cordoba').format('hh:mm:ss');
 
         return currentTime;
     },

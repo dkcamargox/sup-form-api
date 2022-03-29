@@ -5,8 +5,7 @@ const { getSellers, getRoutes } = require("./controllers/sellersController");
 const { postSurvey } = require("./controllers/surveyController");
 
 const {
-  getProductsById,
-  updateProducts
+  getProductsById
 } = require("./controllers/productsController");
 
 const {
@@ -65,8 +64,6 @@ routes.post("/login", logIn);
  */
 // get a list of products by sucursal
 routes.get("/products/:sucursal", getProductsById);
-// rebuild products
-routes.put("/update-sheets", updateProducts);
 /**
  * SURVEY STATISTICS ROUTES
  */

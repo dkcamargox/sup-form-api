@@ -1,7 +1,3 @@
-const {
-  createMaestroConnection,
-  createSucursalConnection
-} = require("../services/sheetsConnections");
 const { getDate, getTime } = require("../utils/dates");
 
 const pool = require('../services/connection');
@@ -28,7 +24,7 @@ module.exports = {
       console.log(error);
       return response
         .status(502)
-        .json({ error: "Busqueda de usuarios falló!" });
+        .json({ error: "Busqueda de 434rdfv  falló!" });
     }
   },
   async getLoginData(request, response) {
@@ -106,75 +102,87 @@ module.exports = {
    * writes in the sheet the information about the login
    */
   async logIn(request, response) {
+    const client = await pool.connect()
     try {
-      const maestroDoc = await createMaestroConnection();
+      const {
+        userId,
+        password,
+        sucursal,
+        cordy,
+        cordx
+      } = request.body
 
-      const usersSheet = maestroDoc.sheetsByTitle["usuarios"];
-
-      const usersSheetRows = await usersSheet.getRows();
-
-      const usersList = usersSheetRows.map((user) => {
-        return {
-          id: user.id,
-          name: user.usuario,
-          password: user.password,
-          sucursal: user.sucursal,
-          roll: user.roll
-        };
-      });
-
-      const logInUser = usersList.find(
-        (user) => user.id === String(request.body.userId)
+      const { rows: passwordRows } = await pool.query(
+        'SELECT COUNT(*) FROM supervisors WHERE id = $1 AND password = $2',
+        [userId, password]
       );
-      let sucursalDoc;
+      const { count: passwordCount } = passwordRows[0];
 
-      /**
-       * if user sucursal is 0 then he has access to whatever sucursal he wants
-       * else he has to access the sucursal he is design to
-       */
-      console.log(logInUser);
-      if (
-        logInUser.sucursal === "0" ||
-        String(request.body.sucursal) === logInUser.sucursal
-      ) {
-        console.log(request.body.sucursal);
-        sucursalDoc = await createSucursalConnection(request.body.sucursal);
-      } else {
-        return response
-          .status(403)
-          .json({ error: "No tenés accesso a esa sucursal" });
+      const { rows: branchesRows } = await pool.query(
+        'SELECT COUNT(*) FROM supervisors_branches AS sb\
+        WHERE sb.supervisor_id = $1 AND\
+        sb.branch_id = $2',
+        [userId, sucursal]
+      );
+      const { count: branchCount } = branchesRows[0];
+      
+      
+      if (passwordCount !== '1') {
+        return response.status(401).json({
+          match: false,
+          error: "Login falló, su contraseña esta incorrecta"
+        })
       }
 
-      if (logInUser.password === request.body.password) {
-        try {
-          /**
-           * add a login log into the sheet
-           * usuario	data 	hora	coordenada y	coordenada x
-           */
-          const loginSheet = sucursalDoc.sheetsByTitle["logueos de supervisor"];
+      if (branchCount !== '1') {
+        return response.status(401).json({
+          match: false,
+          error: "Login falló, no tiene accesso a esa sucursal"
+        })
+      }
+      
+      await client.query('BEGIN')
+      await pool.query(
+        'INSERT INTO logins(supervisor_id, date, time, cordy, cordx) VALUES($1,$2,$3,$4,$5);',
+        [
+          userId,
+          getDate(),
+          getTime(),
+          cordy,
+          cordx
+        ]
+      )
+      await client.query('COMMIT')
 
-          loginSheet.addRow({
-            usuario: logInUser.name,
-            data: getDate(),
-            hora: getTime(),
-            latitud: request.body.cordy,
-            longitud: request.body.cordx
-          });
-        } catch (error) {
-          console.log(error);
-          return response
-            .status(502)
-            .json({ error: "Registrar el login falló" });
+      let { rows: userRows } = await pool.query(
+        'SELECT s.name, s.id, s.roll AS roll FROM supervisors AS s, supervisors_branches AS sb\
+        WHERE s.id = $1 AND s.password = $2 AND\
+        sb.supervisor_id = $1 AND\
+        sb.branch_id = $3',
+        [userId, password, sucursal]
+      );
+
+      const {
+        id,
+        name,
+        roll
+      } = userRows[0]
+      
+      return response.status(200).json({
+        match: true,
+        user: {
+          userId,
+          id,
+          name,
+          roll: roll === 0 ? 'admin' : 'super'
         }
-        return response.status(200).json({ match: true, user: logInUser});
-      } else {
-        return response
-          .status(401)
-          .json({ match: false, error: "Contraseña incorrecta" });
-      }
+      });
     } catch (error) {
       console.log(error);
+      await client.query('ROLLBACK')
       return response.status(502).json({ error: "Teste de constraseña falló" });
+    } finally {
+      client.release()
     }
   }
 };
