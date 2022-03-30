@@ -17,8 +17,9 @@ module.exports = {
         const client = await pool.connect()
         try {
             console.log('CREATE CONTINUE');
-            console.log(`REQUEST ${request.body}`);
-
+            console.log(`REQUEST`);
+            console.log(request.body);
+            
             const { supervisor, route, formType, sucursal } = request.body;
 
             await client.query('BEGIN');
@@ -33,12 +34,31 @@ module.exports = {
                 ]   
             );
             const continueId = continuesRows[0].id;
+            let threadId;
 
-            if(request.body.formType === 'coaching') {
+            if (request.body.formType === 'coaching') {
                 /**
                  * add stats
                  * add continues_stats
                  */
+                const { rows: threadRow } = await pool.query(
+                    `INSERT INTO coaching_threads(
+                        supervisor_id,
+                        route_id
+                    ) VALUES(
+                        $1,$2
+                    ) RETURNING id;`,
+                    [
+                        parseInt(supervisor),
+                        parseInt(route),
+                    ]
+                );
+
+                
+                threadId = threadRow[0].id;
+                
+                console.log(threadId);
+
                 const { rows: statsRows } = await pool.query(
                     'INSERT INTO stats(\
                         last_order,\
@@ -52,10 +72,12 @@ module.exports = {
                         delivery_precautions,\
                         pop_pricing,\
                         time_management,\
-                        catalogue\
+                        catalogue,\
+                        thread_id\
                     ) VALUES(\
-                        0,0,0,0,0,0,0,0,0,0,0,0\
-                    ) RETURNING id;'
+                        0,0,0,0,0,0,0,0,0,0,0,0,$1\
+                    ) RETURNING id;',
+                    [threadId]
                 );
                 const statId = statsRows[0].id;
 
@@ -70,7 +92,7 @@ module.exports = {
             
             return response
                 .status(200)
-                .json({ error: false, id: continueId });
+                .json({ error: false, id: continueId, threadId });
 
         } catch (error) {
             console.log(error);
@@ -254,7 +276,8 @@ module.exports = {
                 s.delivery_precautions,\
                 s.pop_pricing,\
                 s.time_management,\
-                s.catalogue \
+                s.catalogue,\
+                s.thread_id\
                 FROM continues AS c, continues_stats AS cs, stats AS s WHERE \
                 cs.continue_id = c.id AND\
                 cs.stat_id = s.id;"
