@@ -17,95 +17,116 @@ const {
 } = require("../utils/searches");
 const surveyController = require("./surveyController");
 
+
+const pool = require('../services/connection');
+
 module.exports = {
     async getSurveyData(request, response) {
+        console.log('GET SURVEY DATA GRAPHICS');
+        console.log(`REQUEST`);
+        console.log(`branch: ${request.params.sucursal}`);
+        const branch = request.params.sucursal;
+        const client = await pool.connect();
         try {
-            const sucursalDoc = await createSucursalConnection(request.params.sucursal);
-            const surveySheet = await sucursalDoc.sheetsByTitle["relevameinto"];
-
-            const surveyRows = await surveySheet.getRows();
-
-            let responseData = {};
-
-            // Surveys by supervisors
-
-            // getting supervisors rows
-            const supervisorSurveyData = surveyRows.map(row => {
-                return row['Supervisor']
-            });
-
-            // parsing from obj to array
-            const supervisorSurveyCounts = {};
-            supervisorSurveyData.forEach(function (x) { supervisorSurveyCounts[x] = (supervisorSurveyCounts[x] || 0) + 1; });
+                
+            const { rows: supervisorsSurveyCountRows } = await client.query(`
+                SELECT sup.name, count(sur.id) AS survey_countage
+                FROM supervisors AS sup,
+                surveys AS sur,
+                supervisors_branches AS sb
+                WHERE sur.supervisor_id = sup.id
+                AND sb.supervisor_id = sup.id
+                AND sb.branch_id = $1
+                GROUP BY sup.id;
+            `,[
+                branch
+            ]);
             
-            // threating data to fit react-google-charts
-            const supervisorSurveyCountsArray = Object.entries(supervisorSurveyCounts).map(supervisorSurveyCounts => supervisorSurveyCounts);
+            const supervisorSurveyCountsArray = supervisorsSurveyCountRows.map(
+                ({name, survey_countage}) => {
+                return [
+                    name,
+                    parseInt(survey_countage),
+                ];
+            });
             
             // adding headers
-            supervisorSurveyCountsArray.push(['Supervisor', 'Cuantidad de Relevamientos']);
-            
             // reversing for the headers be on position 0
             supervisorSurveyCountsArray.reverse();
+            supervisorSurveyCountsArray.push(['Supervisor', 'Cuantidad de Relevamientos']);
+            supervisorSurveyCountsArray.reverse();
             
-            // clog for debug
             console.log(supervisorSurveyCountsArray);
             
-            // adding to the response
-            responseData['supervisor'] = supervisorSurveyCountsArray;
-
-
-            // Surveys by sellers
-
-            // getting sellers rows
-            const sellerSurveyData = surveyRows.map(row => {
-                return row['Preventista']
+            const { rows: sellersSurveyCountRows } = await client.query(`
+                SELECT slr.name, count(sur.id) AS survey_countage
+                FROM routes AS rut,
+                surveys AS sur,
+                sellers AS slr
+                WHERE 
+                sur.route_id = rut.id
+                AND slr.id = rut.seller_id
+                AND slr.branch_id=$1
+                GROUP BY slr.id
+                ORDER BY slr.name;
+            `,[
+                branch
+            ]);
+            
+            const sellersSurveyCountsArray = sellersSurveyCountRows.map(
+                ({name, survey_countage}) => {
+                return [
+                    name,
+                    parseInt(survey_countage),
+                ];
             });
-            
-            // parsing from obj to array
-            const sellerSurveyCounts = {};
-            sellerSurveyData.forEach(function (x) { sellerSurveyCounts[x] = (sellerSurveyCounts[x] || 0) + 1; });
-            
-            // threating data to fit react-google-charts
-            const sellerSurveyCountsArray = Object.entries(sellerSurveyCounts).map(surveyCount => surveyCount);
-            
             // adding headers
-            sellerSurveyCountsArray.push(['Preventista', 'Cuantidad de Relevamientos']);
-
             // reversing for the headers be on position 0
-            sellerSurveyCountsArray.reverse();
+            sellersSurveyCountsArray.reverse();
+            sellersSurveyCountsArray.push(["Preventista","Cuantidad de Relevamientos"]);
+            sellersSurveyCountsArray.reverse();
             
-            // clog for debug
-            console.log(sellerSurveyCountsArray);
+            console.log(sellersSurveyCountsArray);
             
-            // adding to the response
-            responseData['seller'] = sellerSurveyCountsArray;
-
-
-            // Surveys by sellers
-
-            // getting sellers rows
-            const logisticSurveyData = surveyRows.map(row => {
-                return row['Problemas de logistica?']
+            
+            const { rows: logisticsProblemsRows } = await client.query(`
+                SELECT sur.logistics_problems as value,
+                count(sur.logistics_problems) as countage
+                FROM routes AS rut,
+                surveys AS sur,
+                sellers AS slr
+                WHERE 
+                sur.route_id = rut.id
+                AND slr.id = rut.seller_id
+                AND slr.branch_id=$1
+                GROUP BY sur.logistics_problems
+                ORDER BY sur.logistics_problems DESC;
+            `,[
+                branch
+            ]);
+            
+            const logisticsProblemsArray = logisticsProblemsRows.map(
+                ({value, countage}) => {
+                return [
+                    value ? 'Sí' : 'No',
+                    parseInt(countage),
+                ];
             });
-            
-            // parsing from obj to array
-            const logisticSurveyCounts = {};
-            logisticSurveyData.forEach(function (x) { logisticSurveyCounts[x] = (logisticSurveyCounts[x] || 0) + 1; });
-            
-            // threating data to fit react-google-charts
-            const logisticSurveyCountsArray = Object.entries(logisticSurveyCounts).map(surveyCount => surveyCount);
-            
             // adding headers
-            logisticSurveyCountsArray.push(['Valor', 'Cantidad']);
-
             // reversing for the headers be on position 0
-            logisticSurveyCountsArray.reverse();
+            logisticsProblemsArray.reverse();
+            logisticsProblemsArray.push(["Valor","Cantidad"]);
+            logisticsProblemsArray.reverse();
             
+            console.log(logisticsProblemsArray);
+            
+            responseData = {
+                supervisor: supervisorSurveyCountsArray,
+                seller: sellersSurveyCountsArray,
+                logistic: logisticsProblemsArray
+            }
             // clog for debug
-            console.log(logisticSurveyCountsArray);
             
-            // adding to the response
-            responseData['logistic'] = logisticSurveyCountsArray;
 
             return response
                 .status(200)
@@ -114,21 +135,19 @@ module.exports = {
             
         } catch (error) {
             console.log(error);
-            return response
-                .status(502)
-                .json({ error: "Busqueda de datos de relevamiento falló!" });
+            await client.query('ROLLBACK');
+            return response.status(502).json({ error: "Cadastro de Coaching falló" });
         }
     },
 
     async getProductsSurveyData(request, response) {
+        console.log('GET PRODUCTS SURVEY DATA GRAPHICS');
+        console.log(`REQUEST`);
+        console.log(`branch: ${request.params.sucursal}`);
+        const branch = request.params.sucursal;
+        const client = await pool.connect();
         try {
-            const sucursalDoc = await createSucursalConnection(request.params.sucursal);
-            
-            const surveySheet = sucursalDoc.sheetsByTitle["relevameinto"];
-            
-            let surveyRows = await surveySheet.getRows();
-
-
+                
             // apply filters here and store in surveyRows
             console.log(request.query)
 
@@ -157,168 +176,152 @@ module.exports = {
                     route = await getRouteNameById(request.params.sucursal, selectedRoute)
                 }                
                 
-                surveyRows = surveyRows.filter(row => {
-                    const date = new Date(parseDate(row['Data']))
-                    if (selectedSupervisor === '') {
-                        if (selectedSeller === '') {
-                            return (
-                                date >= initialDate &&
-                                date <= finalDate
-                            )
-                        } else if (selectedRoute === '') {
-                            return (
-                                date >= initialDate &&
-                                date <= finalDate &&
-                                row['Preventista'] === seller
-                            )
-                        } else {
-                            return (
-                                date >= initialDate &&
-                                date <= finalDate &&
-                                row['Preventista'] === seller &&
-                                row['Ruta'] === route
-                            )
-                        }
-                    } else {
-                        if (selectedSeller === '') {
-                            return (
-                                date >= initialDate &&
-                                date <= finalDate &&
-                                row['Supervisor'] === supervisor
-                            )
-                        } else if (selectedRoute === '') {
-                            return (
-                                date >= initialDate &&
-                                date <= finalDate &&
-                                row['Preventista'] === seller &&
-                                row['Supervisor'] === supervisor
-                            )
-                        } else {
-                            return (
-                                date >= initialDate &&
-                                date <= finalDate &&
-                                row['Preventista'] === seller &&
-                                row['Ruta'] === route &&
-                                row['Supervisor'] === supervisor
-                            )
-                        }
-                    }
-                });
+                // TODO APPLY FILTERS
                 
             }
             
-            const numberOfSurveys = surveyRows.map(row => {
-                return row['Supervisor']
-            }).length;
-                        
+            const { rows: visitedRows } = await client.query(`
+                SELECT sur.client_visited as value,
+                count(sur.client_visited) as countage
+                FROM routes AS rut,
+                surveys AS sur,
+                sellers AS slr
+                WHERE 
+                sur.route_id = rut.id
+                AND slr.id = rut.seller_id
+                AND slr.branch_id=$1
+                GROUP BY sur.client_visited
+                ORDER BY sur.client_visited DESC;
+            `,[
+                branch
+            ]);
+            const { rows: mixRows } = await client.query(`
+                SELECT sur.client_with_mix as value,
+                count(sur.client_with_mix) as countage
+                FROM routes AS rut,
+                surveys AS sur,
+                sellers AS slr
+                WHERE 
+                sur.route_id = rut.id
+                AND slr.id = rut.seller_id
+                AND slr.branch_id=$1
+                GROUP BY sur.client_with_mix
+                ORDER BY sur.client_with_mix DESC;
+            `,[
+                branch
+            ]);
             
-            // Surveys by sellers
-
-            // getting sellers rows
-            const visitedPDVRows = surveyRows.map(row => {
-                return row['Visitado?']
+            const visitedArray = visitedRows.filter(({value, countage}) => value !== null).map(
+                ({value, countage}) => {
+                return [
+                    value ? 'Sí' : 'No',
+                    parseInt(countage),
+                ];
             });
-            // parsing from obj to array
-            const visitedPDVCounts = {};
-            visitedPDVRows.forEach(function (x) { visitedPDVCounts[x] = (visitedPDVCounts[x] || 0) + 1; });
             
-            // threating data to fit react-google-charts
-            let visitedPDVCountsArray = Object.entries(visitedPDVCounts).map(surveyCount => surveyCount).sort();
-
-            // adding headers
-            visitedPDVCountsArray.push(['Valor', 'Cantidad']);
-
-            // reversing for the headers be on position 0
-            visitedPDVCountsArray.reverse();
-            
-            // getting sellers rows
-            const mixPDVRows = surveyRows.map(row => {
-                return row['Mix?']
-            }).filter(row => {
-                return row !== ''
+            const mixArray = mixRows.filter(({value, countage}) => value !== null).map(
+                ({value, countage}) => {
+                return [
+                    value ? 'Sí' : 'No',
+                    parseInt(countage),
+                ];
             });
 
-            // parsing from obj to array
-            const mixPDVCounts = {};
-            mixPDVRows.forEach(function (x) { mixPDVCounts[x] = (mixPDVCounts[x] || 0) + 1; });
+            const { rows: surveyRows } = await client.query(`
+                SELECT count(sur.id) as countage
+                FROM routes AS rut,
+                surveys AS sur,
+                sellers AS slr
+                WHERE 
+                sur.route_id = rut.id
+                AND slr.id = rut.seller_id
+                AND slr.branch_id=$1
+            `,[
+                branch
+            ]);
             
-            // threating data to fit react-google-charts
-            let mixPDVCountsArray = Object.entries(mixPDVCounts).map(surveyCount => surveyCount).sort();
+            const surveyCount = surveyRows[0].countage;
+            
+            const { rows: surveyProductsRows } = await client.query(`
+                SELECT 
+                t.name AS product_type,
+                p.label AS product,
+                st.type AS survey_type,
+                AVG( (sp.value)::int ) AS media 
+                FROM
+                surveys_products AS sp,
+                products AS p,
+                surveys AS sur, 
+                sellers AS slr, 
+                routes AS rut,
+                products_types_branches AS ptb,
+                types AS t,
+                survey_types AS st
+                WHERE 
+                rut.seller_id = slr.id 
+                AND sp.survey_id= sur.id
+                AND sur.route_id=rut.id 
+                AND slr.branch_id = $1
+                and ptb.branch_id = $1
+                AND ptb.type_id = t.id
+                AND sp.survey_type_id = st.id
+                AND sp.product_id = p.id
+                AND ptb.product_id = p.id
+                GROUP BY t.name, st.type, st.id, p.label, p.id, ptb.type_id
+                ORDER BY ptb.type_id, p.id, st.id DESC;
+            `,[
+                branch
+            ]);
+            
+            var groupBy = (xs, key) => {
+                return xs.reduce((rv, x) => {
+                    (rv[x[key]] = rv[x[key]] || []).push(x);
+                    return rv;
+                }, {});
+            };
 
+            let groupedByProductType = groupBy(surveyProductsRows, 'product_type')
+            
+            Object.entries(groupedByProductType).forEach(
+                ([key, row]) => {
+                    groupedByProductType[key] = groupBy(row, 'product')
+                }
+            )
+            let productsPercentages = {};
+            Object.entries(groupedByProductType).forEach(
+                ([ikey, irow]) => {
+                    productsPercentages[ikey] = [...Object.entries(irow).map(
+                        ([jkey, jrow]) => {
+                            return [...Object.entries(jrow).map(
+                                ([zkey, zrow]) => {
+                                    return parseFloat(zrow.media)
+                                }
+                            ),
+                            jkey].reverse()
+                        }
+                    )]
+                }
+            )
             // adding headers
-            mixPDVCountsArray.push(['Valor', 'Cantidad']);
-
-            // reversing for the headers be on position 0
-            mixPDVCountsArray.reverse();
+            visitedArray.reverse()
+            visitedArray.push(["Valor","Cantidad"])
+            visitedArray.reverse()
+            
+            mixArray.reverse()
+            mixArray.push(["Valor","Cantidad"])
+            mixArray.reverse()
+            
+            let productsPercetageByType = {...productsPercentages}
+            productsPercetageByType['visitedPdv']  = visitedArray;
             
             
-            // clog for debug
-            console.log(mixPDVCountsArray);
-            console.log(visitedPDVCountsArray);
             
-            const productsByType = await getProductsBySucursalId(request.params.sucursal);            
-
-            console.log(productsByType)
+            productsPercetageByType['surveyCount']  = surveyCount;
+            productsPercetageByType['mixedPdv']  = mixArray;
             
-            const productsPercetageByType = {}
 
-            Object.entries(productsByType).forEach(([productsType, products]) => {
-                // getting each product label and parsing to the title sheet format
-                let treatedProductData = products.map(product => {
-                    if (productsType === "redcom") {
-                        return [
-                            `hay ${product.label}?`, //cobertura
-                            `tiene afiche de ${product.label}?`, //afiche
-                            `está ${product.label} precificado correctamente?`, //precificacion
-                            `está ${product.label} exhibido correctamente?` //exhibicion
-                        ]
-                    } else {
-                        return [
-                            `hay ${product.label}?`, //cobertura
-                            `tiene afiche de ${product.label}?`, //afiche
-                            `está ${product.label} precificado correctamente?`, //precificacion
-                        ]
-                    }
-                })
-                
-                // getting product survey info
-                let productRows = treatedProductData.map(productData => {
-                    // get the raw suvey data
-                    const productPercentages = productData.map(productLabel => {
-                        surveyCounts = {}
-                        //iterates over each column of data of each product
-                        surveyRows.map(row => {
-                            // return the data in the column
-                            return row[productLabel]
-                        })
-                        .filter(row => {
-                            return row !== ''
-                        })
-                        .forEach(function (x) { surveyCounts[x] = (surveyCounts[x] || 0) + 1; }); //count the times of yes and no for taking data
-                        const aux = {}
-    
-                        // counting if its not null tho
-                        const yesCount = surveyCounts['Sí'] || 0;
-                        const noCount = surveyCounts['No'] || 0;
-                        // geting percentages returning
-                        return  aux[productLabel] = yesCount / (yesCount + noCount)
-                        
-                    });
-                    // putting data into array to match the googlecharts data format
-                    return Object.values(productPercentages)
-                });
-                
-                // adding the corresponding product to match the data
-                const productsTreatedData = products.map((product, index) => {
-                    return [product.label, ...productRows[index]]
-                });
-                return productsPercetageByType[productsType] = productsTreatedData;
-            })
-
-            productsPercetageByType['surveyCount']  = numberOfSurveys;
-            productsPercetageByType['visitedPdv']  = visitedPDVCountsArray;
-            productsPercetageByType['mixedPdv']  = mixPDVCountsArray;
-            if (surveyRows.length === 0) {
+            
+            if (surveyRows === 0) {
                 productsPercetageByType['code']  = 1;
             } else {
                 productsPercetageByType['code']  = 0;
