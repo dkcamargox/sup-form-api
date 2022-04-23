@@ -150,6 +150,7 @@ module.exports = {
                 
             // apply filters here and store in surveyRows
             console.log(request.query)
+            let queryFilter = ``;
 
             if (`${request.query.filter}` === 'true') {
                 const {
@@ -157,26 +158,28 @@ module.exports = {
                     selectedRoute,
                     selectedSupervisor
                 } = request.query;
-
-                const finalDate = new Date(request.query.finalDate)
-                const initialDate = new Date(request.query.initialDate)
                 
-                let supervisor;
-                let seller;
-                let route;
+                const finalDate = new Date(request.query.finalDate)
+                const initialDate = new Date(request.query.initialDate)       
 
+
+                queryFilter += `AND sur.date >= '${initialDate.toLocaleString('en-GB').split(',')[0]}'` 
+                queryFilter += ` AND sur.date <= '${finalDate.toLocaleString('en-GB').split(',')[0]}'` 
+                
                 if (selectedSupervisor !== '') {
-                    supervisor = await getSupervisorNameById(selectedSupervisor)
+                    queryFilter += `
+                    AND sur.supervisor_id = ${selectedSupervisor}` 
                 }
                 if (selectedSeller !== '') {
-                    seller = await getSellerNameById(request.params.sucursal, selectedSeller)
+                    queryFilter += `
+                    AND sur.route_id = rut.id
+                    AND rut.seller_id = ${selectedSeller}`
                 }
                 
                 if (selectedRoute !== '') {
-                    route = await getRouteNameById(request.params.sucursal, selectedRoute)
-                }                
-                
-                // TODO APPLY FILTERS
+                    queryFilter += `
+                    AND sur.route_id = ${selectedRoute}` 
+                }
                 
             }
             
@@ -190,6 +193,7 @@ module.exports = {
                 sur.route_id = rut.id
                 AND slr.id = rut.seller_id
                 AND slr.branch_id=$1
+                ${queryFilter}
                 GROUP BY sur.client_visited
                 ORDER BY sur.client_visited DESC;
             `,[
@@ -205,6 +209,7 @@ module.exports = {
                 sur.route_id = rut.id
                 AND slr.id = rut.seller_id
                 AND slr.branch_id=$1
+                ${queryFilter}
                 GROUP BY sur.client_with_mix
                 ORDER BY sur.client_with_mix DESC;
             `,[
@@ -226,7 +231,6 @@ module.exports = {
                     parseInt(countage),
                 ];
             });
-
             const { rows: surveyRows } = await client.query(`
                 SELECT count(sur.id) as countage
                 FROM routes AS rut,
@@ -236,9 +240,11 @@ module.exports = {
                 sur.route_id = rut.id
                 AND slr.id = rut.seller_id
                 AND slr.branch_id=$1
+                ${queryFilter}
             `,[
                 branch
             ]);
+            
             
             const surveyCount = surveyRows[0].countage;
             
@@ -267,11 +273,42 @@ module.exports = {
                 AND sp.survey_type_id = st.id
                 AND sp.product_id = p.id
                 AND ptb.product_id = p.id
+                ${queryFilter}
                 GROUP BY t.name, st.type, st.id, p.label, p.id, ptb.type_id
                 ORDER BY ptb.type_id, p.id, st.id DESC;
             `,[
                 branch
             ]);
+            
+            console.log(`
+            SELECT 
+            t.name AS product_type,
+            p.label AS product,
+            st.type AS survey_type,
+            AVG( (sp.value)::int ) AS media 
+            FROM
+            surveys_products AS sp,
+            products AS p,
+            surveys AS sur, 
+            sellers AS slr, 
+            routes AS rut,
+            products_types_branches AS ptb,
+            types AS t,
+            survey_types AS st
+            WHERE 
+            rut.seller_id = slr.id 
+            AND sp.survey_id= sur.id
+            AND sur.route_id=rut.id 
+            AND slr.branch_id = $1
+            and ptb.branch_id = $1
+            AND ptb.type_id = t.id
+            AND sp.survey_type_id = st.id
+            AND sp.product_id = p.id
+            AND ptb.product_id = p.id
+            ${queryFilter}
+            GROUP BY t.name, st.type, st.id, p.label, p.id, ptb.type_id
+            ORDER BY ptb.type_id, p.id, st.id DESC;
+        `)
             
             var groupBy = (xs, key) => {
                 return xs.reduce((rv, x) => {
@@ -340,66 +377,54 @@ module.exports = {
         }
     },
     async getCoachingData(request, response) {
-        
-
+        console.log('GET COACHING DATA');
+        console.log(`REQUEST`);
+        console.log(`branch: ${request.params.sucursal}`);
+        const branch = request.params.sucursal;
+        const client = await pool.connect();
         try {
-            const sucursalDoc = await createSucursalConnection(request.params.sucursal);
-            const coachingSheet = await sucursalDoc.sheetsByTitle["post-coaching"];
-
-            const coachingsRows = await coachingSheet.getRows();
-
-            const allSellers = await getSellerBySucursal(request.params.sucursal);
-
-
-            const coachings = coachingsRows.map(row => {
-                return {
-                    'supervisor': row['Supervisor'],
-                    'seller': row['Preventista'],
-                    'date': new Date(parseDate(row['Data'])),
-                    'coaching': row['Puntaje Final'],
-                    'pop': row['¿POP?'],
-                    'exibition': row['¿Trabaja en una mayor exposición de los productos?'],
-                }
-            });
+            const { rows: coachingRows } = await client.query(`
+                SELECT x.*
+                FROM (
+                    SELECT slr.id,
+                    spr.name as supervisor,
+                    slr.name as name, 
+                    ct.date, 
+                    pc.total * 100 as coaching, 
+                    pc.pop * 100 as pop, 
+                    pc.exposition * 100 as exhibition, 
+                    ROW_NUMBER() OVER (PARTITION BY slr.name ORDER BY pc.date DESC) AS n
+                    FROM post_coachings AS pc, coaching_threads AS ct, routes AS rut, sellers as slr, supervisors as spr
+                    WHERE pc.thread_id=ct.id AND 
+                    ct.route_id=rut.id AND 
+                    rut.seller_id=slr.id AND 
+                    ct.supervisor_id = spr.id AND
+                    slr.branch_id = $1
+                    ORDER BY slr.id
+                ) AS x
+                WHERE n <= 1;
+            `,[
+                branch
+            ]);
             
-            let dataBySeller = Object()
-
-            coachings.forEach(coaching => {
-                if (dataBySeller.hasOwnProperty(coaching.seller)) {
-                    dataBySeller[coaching.seller].push(coaching)
-                } else {
-                    dataBySeller[coaching.seller] = [coaching]
+            const coachings = coachingRows.map(coaching => {
+                return {
+                    id: coaching.id,
+                    name: coaching.name,
+                    coaching:{
+                        supervisor: coaching.supervisor,
+                        seller: coaching.seller,
+                        date: coaching.date,
+                        coaching: `${coaching.coaching.toFixed(2)}%`.replace('.', ','),
+                        pop: `${coaching.pop.toFixed(2)}%`.replace('.', ','),
+                        exibition: `${coaching.exhibition.toFixed(2)}%`.replace('.', ',')
+                    }
                 }
-            });
-
-            // Object.entries(productsByType).forEach(([productsType, products])
-            Object.entries(dataBySeller).forEach(([seller, coachings]) => {
-                dataBySeller[seller] = coachings.reduce((a, b) => {
-                    return new Date(a.MeasureDate) > new Date(b.MeasureDate) ? a : b;
-                });
             })
             
-            
-            const coachingDataBySeller = []
-            Object.entries(dataBySeller).forEach(async ([seller, coaching]) => {
-                console.log(seller)
-                const thisSellerData = allSellers.find(thisSeller => thisSeller.name === seller);
-                console.log(thisSellerData)
-                coachingDataBySeller.push({
-                    id: thisSellerData.id,
-                    name: seller,
-                    coaching: coaching
-                })
-            });
-            
-            // sorting by id
-            coachingDataBySeller.sort((a, b) => (a.id - b.id));
-
-            console.log(coachingDataBySeller)
             return response
                 .status(200)
-                .json(coachingDataBySeller)
-            
+                .json(coachings)
             
         } catch (error) {
             console.log(error);
@@ -409,37 +434,57 @@ module.exports = {
         }
     },
     async getCoachingHistoryBySellerId(request, response) {
-        
-
+        console.log('GET COACHING DATA BY SELLER ID');
+        console.log(`REQUEST`);
+        console.log(`branch: ${request.params.sucursal}`);
+        console.log(request.params);
+        console.log(request.body);
+        const branch = request.params.sucursal;
+        const sellerId = request.params.sellerId;
+        const client = await pool.connect();
         try {
-            const sucursalDoc = await createSucursalConnection(request.params.sucursal);
-            const coachingSheet = await sucursalDoc.sheetsByTitle["post-coaching"];
+            const { rows: coachingRows } = await client.query(`
+                SELECT
+                    ct.id as coaching_id, 
+                    spr.name as supervisor,
+                    slr.id as seller_id,
+                    slr.name as seller,
+                    ct.date, 
+                    pc.total * 100 as coaching, 
+                    pc.pop * 100 as pop, 
+                    pc.exposition * 100 as exhibition
+                FROM post_coachings AS pc, coaching_threads AS ct, routes AS rut, sellers as slr, supervisors as spr
+                WHERE pc.thread_id=ct.id AND 
+                ct.route_id=rut.id AND 
+                rut.seller_id=slr.id AND 
+                spr.id = ct.supervisor_id AND
+                slr.id= $1
+                ORDER BY pc.date DESC;
+            `,[
+                sellerId
+            ]);
 
-            const coachingsRows = await coachingSheet.getRows();
+            const { rows: sellers } = await client.query(`
+                SELECT name FROM sellers WHERE id = $1;
+            `,[
+                sellerId
+            ]);
 
-            const sellerName = await getSellerNameById(request.params.sucursal, request.params.sellerId);
-            
-            const coachings = coachingsRows.map(row => {
+            var responseFormated = {}
+            responseFormated['sellerName'] = sellers[0].name
+            responseFormated['coachings'] = coachingRows.map(coaching => {
                 return {
-                    'coachingId': row['_rowNumber'],
-                    'supervisor': row['Supervisor'],
-                    'seller': row['Preventista'],
-                    'sellerId': request.params.sellerId,
-                    'date': new Date(parseDate(row['Data'])),
-                    'coaching': row['Puntaje Final'],
-                    'pop': row['¿POP?'],
-                    'exibition': row['¿Trabaja en una mayor exposición de los productos?'],
+                    coachingId: coaching.coaching_id,
+                    supervisor: coaching.supervisor,
+                    seller: coaching.seller,
+                    sellerId: coaching.seller_id,
+                    date: coaching.date,
+                    coaching: `${coaching.coaching.toFixed(2)}%`.replace('.', ','),
+                    pop: `${coaching.pop.toFixed(2)}%`.replace('.', ','),
+                    exibition: `${coaching.exhibition.toFixed(2)}%`.replace('.', ',')
                 }
-            }).filter(row => {
-                return row.seller === sellerName
-            });
-            
-            let responseFormated = {};
-            responseFormated['sellerName'] = sellerName;
-            responseFormated['coachings'] = coachings.reverse();
-            
-            console.log(responseFormated)
-            
+            })
+
             return response
             .status(200)
                 .json(responseFormated)
@@ -453,63 +498,86 @@ module.exports = {
         }
     },
     async getCoachingDataById(request, response) {
-        const parsePercentageToFloat = percentage => {
-            var floatPercentage = parseFloat(percentage); // 20.1
-
-            if(!isNaN(floatPercentage)){
-                floatPercentage /= 100; // .201
-            }
-
-            return floatPercentage
-        }
-
+        console.log('GET COACHING DATA BY COACHING ID');
+        console.log(`REQUEST`);
+        console.log(`branch: ${request.params.sucursal}`);
+        console.log(request.params);
+        console.log(request.body);
+        const sellerId = request.params.sellerId;
+        const coachingId = request.params.coachingId;
+        const client = await pool.connect();
         try {
-            const sucursalDoc = await createSucursalConnection(request.params.sucursal);
-            const coachingSheet = await sucursalDoc.sheetsByTitle["post-coaching"];
-
-            const coachingsRows = await coachingSheet.getRows();
-
-            const sellerName = await getSellerNameById(request.params.sucursal, request.params.sellerId);
+            const { rows: coachingRows } = await client.query(`
+                    SELECT
+                        ct.id,
+                        spr.name as supervisor,
+                        slr.id as seller_id,
+                        slr.name as seller,
+                        pc.date,
+                        pc.total,
+                        pc.last_order,
+                        pc.sell_plan,
+                        pc.pop,
+                        pc.stock,
+                        pc.exposition,
+                        pc.competitor_sales,
+                        pc.sales,
+                        pc.sell_propouse,
+                        pc.delivery_precautions,
+                        pc.pop_pricing,
+                        pc.time_management,
+                        pc.catalogue,
+                        pc.comment,
+                        pc.strong_point,
+                        pc.weak_point
+                    FROM post_coachings AS pc, coaching_threads AS ct, routes AS rut, sellers as slr, supervisors as spr
+                    WHERE pc.thread_id=ct.id AND 
+                    ct.route_id=rut.id AND 
+                    rut.seller_id=slr.id AND 
+                    spr.id = ct.supervisor_id AND
+                    ct.id = $1
+                    ORDER BY pc.date DESC;
+            `,[
+                coachingId
+            ]);
             
-            const coaching = coachingsRows.map(row => {
+            const { rows: sellers } = await client.query(`
+                SELECT name FROM sellers WHERE id = $1;
+            `,[
+                sellerId
+            ]);
+
+            var responseFormated = {}
+            responseFormated['sellerName'] = sellers[0].name
+            responseFormated['coaching'] = coachingRows.map(coaching => {
                 return {
-                    'coachingId': row['_rowNumber'],
-                    'supervisor': row['Supervisor'],
-                    'seller': row['Preventista'],
-                    'sellerId': request.params.sellerId,
-                    'date': new Date(parseDate(row['Data'])),
-                    total: parsePercentageToFloat(row["Puntaje Final"]),
-                    lastOrder: parsePercentageToFloat(row["¿Indaga sobre el último pedido?"]),
-                    sellPlan: parsePercentageToFloat(row["¿Planifica el pedido antes de ingresar al PDV?"]),
-                    popStat: parsePercentageToFloat(row["¿POP?"]),
-                    stock: parsePercentageToFloat(row["¿Verifica el stock en todas las áreas del PDV?"]),
-                    exposition: parsePercentageToFloat(row["¿Trabaja en una mayor exposición de los productos?"]),
-                    competitorSales: parsePercentageToFloat(row["¿Indaga y verifica la situación y las acciones de la competencia?"]),
-                    sales: parsePercentageToFloat(row["¿Comunica las acciones comerciales vigentes?"]),
-                    sellPropouse: parsePercentageToFloat(row["¿Realiza la propuesta de ventas, ofreciendo todos los productos?"]),
-                    deliveryPrecautions: parsePercentageToFloat(row["¿Toma todos los recaudos necesarios para facilitar la entrega? (pedido, dinero, horario, etc.)"]),
-                    popPricing: parsePercentageToFloat(row["¿Renueva, coloca y pone precios al POP? Siguiendo criterios del PDV"]),
-                    timeManagement: parsePercentageToFloat(row["¿Administra el tiempo de permanencia en el PDV?"]),
-                    catalogue: parsePercentageToFloat(row["¿Uso de Catálogo?"]),
-                    comment: row['Comentarios'],
-                    strongPoints: row['Puntos Fuertes'],
-                    weakPoints: row['Puntos a desarollar']   
+                    coachingId: coaching.id,
+                    supervisor: coaching.supervisor,
+                    seller: coaching.seller,
+                    sellerId: coaching.seller_id,
+                    date: coaching.date,
+                    total: Math.round(100 * coaching.total) / 100,
+                    lastOrder: Math.round(100 * coaching.last_order) / 100,
+                    sellPlan: Math.round(100 * coaching.sell_plan) / 100,
+                    popStat: Math.round(100 * coaching.pop) / 100,
+                    stock: Math.round(100 * coaching.stock) / 100,
+                    exposition: Math.round(100 * coaching.exposition) / 100,
+                    competitorSales: Math.round(100 * coaching.competitor_sales) / 100,
+                    sales: Math.round(100 * coaching.sales) / 100,
+                    sellPropouse: Math.round(100 * coaching.sell_propouse) / 100,
+                    deliveryPrecautions: Math.round(100 * coaching.delivery_precautions) / 100,
+                    popPricing: Math.round(100 * coaching.pop_pricing) / 100,
+                    timeManagement: Math.round(100 * coaching.time_management) / 100,
+                    catalogue: Math.round(100 * coaching.catalogue) / 100,
+                    comment: coaching.comment,
+                    strongPoints: coaching.strong_point === null?"":coaching.strong_point,
+                    weakPoints: coaching.weak_point === null?"":coaching.weak_point
                 }
-            }).find(row => {
-                return `${row.coachingId}` === `${request.params.coachingId}`
-            });
-            
-            let responseFormated = {};
-            responseFormated['sellerName'] = sellerName;
-            responseFormated['coaching'] = coaching;
-            
-            console.log(responseFormated)
-            
+            })[0];
+
             return response
             .status(200)
                 .json(responseFormated)
-            
-            
         } catch (error) {
             console.log(error);
             return response
